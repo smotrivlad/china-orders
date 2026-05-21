@@ -2,7 +2,7 @@ import type { Order } from '@/types'
 
 const isImage = (url: string) => /\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(url)
 
-async function tg(token: string, method: string, body: object) {
+export async function tg(token: string, method: string, body: object) {
   return fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -12,11 +12,9 @@ async function tg(token: string, method: string, body: object) {
 
 async function sendFiles(token: string, chatId: string, fileUrls: string[]) {
   if (!fileUrls.length) return
-
   const photos = fileUrls.filter(isImage)
   const docs = fileUrls.filter((u) => !isImage(u))
 
-  // Фото: альбом или одиночное
   if (photos.length === 1) {
     await tg(token, 'sendPhoto', { chat_id: chatId, photo: photos[0] })
   } else if (photos.length > 1) {
@@ -26,7 +24,6 @@ async function sendFiles(token: string, chatId: string, fileUrls: string[]) {
     })
   }
 
-  // Документы: альбом или одиночный
   if (docs.length === 1) {
     await tg(token, 'sendDocument', { chat_id: chatId, document: docs[0] })
   } else if (docs.length > 1) {
@@ -35,6 +32,14 @@ async function sendFiles(token: string, chatId: string, fileUrls: string[]) {
       media: docs.map((url) => ({ type: 'document', media: url })),
     })
   }
+}
+
+export function buildContactButton(orderId: string, contact: string) {
+  const c = contact.trim()
+  if (c.startsWith('@')) {
+    return { text: '💬 Написать клиенту', url: `https://t.me/${c.slice(1)}` }
+  }
+  return { text: '💬 Контакт клиента', callback_data: `c|${orderId}` }
 }
 
 export async function notifyNewOrder(order: Order) {
@@ -58,7 +63,20 @@ export async function notifyNewOrder(order: Order) {
     .filter((l) => l !== null)
     .join('\n')
 
-  await tg(token, 'sendMessage', { chat_id: chatId, text: lines, parse_mode: 'HTML' })
+  await tg(token, 'sendMessage', {
+    chat_id: chatId,
+    text: lines,
+    parse_mode: 'HTML',
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '✅ Принять в работу', callback_data: `s|${order.id}|in_progress` },
+          { text: '🔍 Ищем поставщика', callback_data: `s|${order.id}|searching_supplier` },
+        ],
+        [buildContactButton(order.id, order.contact)],
+      ],
+    },
+  })
 
   if (order.file_urls?.length) {
     await sendFiles(token, chatId, order.file_urls)
