@@ -27,11 +27,17 @@ export async function POST(req: NextRequest) {
 
   for (const file of files) {
     if (!file.size) continue
-    const ext = file.name.split('.').pop()
+    const ext = file.name.split('.').pop() ?? 'bin'
     const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-    const { data: up, error } = await adminClient.storage.from('order-files').upload(path, file)
-    if (!error && up) {
-      const { data: { publicUrl } } = adminClient.storage.from('order-files').getPublicUrl(up.path)
+    const { data: up, error: uploadError } = await adminClient.storage
+      .from('orders-files')
+      .upload(path, file, { contentType: file.type, upsert: false })
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError.message)
+      continue
+    }
+    if (up) {
+      const { data: { publicUrl } } = adminClient.storage.from('orders-files').getPublicUrl(up.path)
       fileUrls.push(publicUrl)
     }
   }
