@@ -21,8 +21,7 @@ export default function AdminLoginPage() {
     })
     setLoading(false)
     if (res.ok) {
-      router.push('/admin/orders')
-      router.refresh()
+      window.location.href = '/admin/orders'
     } else {
       const { error: msg } = await res.json()
       setError(msg)
