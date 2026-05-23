@@ -4,7 +4,7 @@ export default function Logo({ className = '' }: { className?: string }) {
   return (
     <Link href="/" className={`inline-flex items-center gap-3 ${className}`}>
       <img
-        src="/logo.png"
+        src="/logo.png?v=2"
         alt=""
         width={40}
         height={40}

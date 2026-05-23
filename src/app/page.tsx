@@ -97,7 +97,7 @@ export default function HomePage() {
             {/* Right — logo */}
             <div className="hidden lg:flex items-center justify-center">
               <img
-                src="/logo.png"
+                src="/logo.png?v=2"
                 alt="EASTWIND LOGISTIC"
                 width={180}
                 height={180}
