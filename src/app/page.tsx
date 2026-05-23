@@ -203,6 +203,81 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ── CONTACTS ──────────────────────────────────────── */}
+      <section id="contacts" className="py-24">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="text-center mb-12">
+            <div className="section-label justify-center mb-4">Связаться с нами</div>
+            <h2 className="font-display text-4xl sm:text-5xl text-milk">Контакты</h2>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 max-w-3xl mx-auto">
+
+            {/* Telegram */}
+            <a
+              href="https://t.me/ewmanager"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="glass rounded-2xl p-6 flex flex-col items-center gap-4 hover:-translate-y-1 transition-all duration-300 group"
+              style={{ textDecoration: 'none' }}
+            >
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl"
+                style={{ background: 'rgba(39,174,239,0.12)', border: '1px solid rgba(39,174,239,0.2)' }}
+              >
+                ✈️
+              </div>
+              <div className="text-center">
+                <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(245,240,232,0.4)' }}>Telegram</p>
+                <p className="font-semibold text-milk group-hover:text-milk/80 transition-colors">@ewmanager</p>
+              </div>
+            </a>
+
+            {/* ВКонтакте */}
+            <a
+              href="https://vk.com/eastwind63"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="glass rounded-2xl p-6 flex flex-col items-center gap-4 hover:-translate-y-1 transition-all duration-300 group"
+              style={{ textDecoration: 'none' }}
+            >
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                style={{ background: 'rgba(0,119,255,0.12)', border: '1px solid rgba(0,119,255,0.2)' }}
+              >
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M16.003 2C8.268 2 2 8.268 2 16.003 2 23.738 8.268 30 16.003 30 23.738 30 30 23.738 30 16.003 30 8.268 23.738 2 16.003 2zm7.42 18.978h-2.04c-.772 0-1.01-.616-2.396-2.018-1.21-1.178-1.744-1.337-2.042-1.337-.414 0-.533.12-.533.69v1.842c0 .495-.158.79-1.464.79-2.156 0-4.55-1.307-6.232-3.74C6.88 14.44 6.4 11.92 6.4 11.405c0-.296.12-.573.69-.573h2.04c.514 0 .71.237.908.79.99 2.87 2.654 5.38 3.34 5.38.257 0 .375-.12.375-.772v-3.005c-.08-1.385-.81-1.504-.81-1.998 0-.237.198-.474.514-.474h3.207c.435 0 .59.237.59.75v4.055c0 .435.197.592.317.592.257 0 .474-.157 .948-.632 1.465-1.662 2.514-4.213 2.514-4.213.138-.296.375-.573.888-.573h2.04c.613 0 .75.316.613.75-.257 1.068-2.752 4.708-2.752 4.708-.217.355-.296.514 0 .91.217.296.928.91 1.405 1.464.87.988 1.543 1.82 1.72 2.395.198.573-.099.868-.692.868z" fill="#5181B8"/>
+                </svg>
+              </div>
+              <div className="text-center">
+                <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(245,240,232,0.4)' }}>ВКонтакте</p>
+                <p className="font-semibold text-milk group-hover:text-milk/80 transition-colors">eastwind63</p>
+              </div>
+            </a>
+
+            {/* WeChat */}
+            <div
+              className="glass rounded-2xl p-6 flex flex-col items-center gap-4"
+            >
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                style={{ background: 'rgba(9,187,7,0.12)', border: '1px solid rgba(9,187,7,0.2)' }}
+              >
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12.6 5C7.298 5 3 8.848 3 13.6c0 2.66 1.37 5.03 3.52 6.64l-.88 2.64 3.08-1.54c.9.25 1.86.38 2.88.38.28 0 .56-.01.83-.03-.17-.54-.27-1.1-.27-1.69 0-4.3 3.87-7.78 8.64-7.78.3 0 .6.02.9.05C20.82 8.45 17.07 5 12.6 5zM9.8 10.6a1.1 1.1 0 110 2.2 1.1 1.1 0 010-2.2zm5.6 0a1.1 1.1 0 110 2.2 1.1 1.1 0 010-2.2z" fill="#09BB07"/>
+                  <path d="M21.4 12.8c-4.2 0-7.6 3-7.6 6.6 0 3.65 3.4 6.6 7.6 6.6.9 0 1.77-.14 2.58-.38l2.62 1.31-.75-2.24C27.73 23.24 29 21.15 29 19.4c0-3.6-3.4-6.6-7.6-6.6zm-2.6 5.1a.9.9 0 110 1.8.9.9 0 010-1.8zm5.2 0a.9.9 0 110 1.8.9.9 0 010-1.8z" fill="#09BB07"/>
+                </svg>
+              </div>
+              <div className="text-center">
+                <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(245,240,232,0.4)' }}>WeChat</p>
+                <p className="font-semibold text-milk font-mono tracking-wide">VLADCHINA63</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       <Footer />
     </>
   )
