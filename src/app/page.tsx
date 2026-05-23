@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
-import WindIcon from '@/components/ui/WindIcon'
 
 const SERVICES = [
   {
@@ -143,21 +142,15 @@ export default function HomePage() {
                 </span>
               </h1>
 
-              {/* Wind-curl logo — right of name, white glow/engraved look */}
+              {/* Logo PNG — right of name */}
               <div className="relative flex-shrink-0 mb-1">
                 <LogoBurst />
-                {/* Soft radial glow behind the logo */}
-                <div
-                  className="absolute rounded-full pointer-events-none"
-                  style={{
-                    width: 180, height: 145, left: -24, top: -36,
-                    background: 'radial-gradient(ellipse, rgba(255,255,255,0.07) 0%, transparent 68%)',
-                  }}
-                />
-                <WindIcon
-                  size={104}
-                  className="relative z-10 logo-glow-lg"
-                  style={{ color: '#ffffff' }}
+                <img
+                  src="/logo.png"
+                  alt="EASTWIND LOGISTIC"
+                  width={200}
+                  height={200}
+                  style={{ objectFit: 'contain', background: 'transparent', position: 'relative', zIndex: 10 }}
                 />
               </div>
             </div>
@@ -270,9 +263,9 @@ export default function HomePage() {
             style={{ background: 'linear-gradient(135deg, #8B1A2F 0%, #6B1424 60%, #111C33 100%)' }}
           />
           <div className="absolute inset-0 bg-grid opacity-10" />
-          {/* Decorative wind-curl watermark */}
-          <div className="absolute bottom-[-24px] right-[-16px] pointer-events-none opacity-[0.07]">
-            <WindIcon size={180} style={{ color: '#ffffff' }} />
+          {/* Decorative logo watermark */}
+          <div className="absolute bottom-[-24px] right-[-16px] pointer-events-none opacity-[0.08]">
+            <img src="/logo.png" alt="" width={180} height={180} style={{ objectFit: 'contain' }} />
           </div>
           <div className="relative z-10 px-8 py-16 text-center">
             <h2 className="font-display text-4xl sm:text-5xl text-milk mb-4">Готовы сделать заказ?</h2>
