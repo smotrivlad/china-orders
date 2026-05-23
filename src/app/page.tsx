@@ -99,9 +99,13 @@ export default function HomePage() {
               <img
                 src="/logo.png?v=2"
                 alt="EASTWIND LOGISTIC"
-                width={180}
-                height={180}
-                style={{ objectFit: 'contain' }}
+                width={320}
+                height={320}
+                style={{
+                  objectFit: 'contain',
+                  animation: 'sway 4s ease-in-out infinite',
+                  filter: 'drop-shadow(0 0 18px rgba(139,26,47,0.7)) drop-shadow(0 0 40px rgba(139,26,47,0.3))',
+                }}
               />
             </div>
 
