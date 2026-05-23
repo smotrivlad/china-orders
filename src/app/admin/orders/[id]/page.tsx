@@ -1,6 +1,6 @@
 import { adminClient } from '@/lib/supabase/admin'
 import { notFound } from 'next/navigation'
-import type { Order, Status } from '@/types'
+import type { Order, OrderItem, Status } from '@/types'
 import OrderEditor from './OrderEditor'
 
 export const dynamic = 'force-dynamic'
@@ -17,6 +17,12 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
 
   const o = order as Order & { statuses: Status }
 
+  // Товары: если есть поле items — используем его, иначе собираем из legacy-полей
+  const items: OrderItem[] =
+    o.items && o.items.length > 0
+      ? o.items
+      : [{ product_name: o.product_name, description: o.description, link: o.link, file_urls: o.file_urls }]
+
   return (
     <div className="max-w-2xl">
       <div className="mb-6">
@@ -27,31 +33,51 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
       {/* Инфо о заявке */}
       <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-3">
         <h2 className="font-semibold text-gray-900 mb-4">Данные заявки</h2>
-        <Row label="Клиент" value={`${o.first_name} ${o.last_name}`} />
-        <Row label="Контакт" value={o.contact} />
-        <Row label="Товар" value={o.product_name} />
-        {o.description && <Row label="Описание" value={o.description} />}
-        {o.link && (
-          <Row label="Ссылка" value={
-            <a href={o.link} target="_blank" rel="noopener" className="text-red-600 hover:underline break-all">{o.link}</a>
-          } />
-        )}
+        <Row label="Клиент"   value={`${o.first_name} ${o.last_name}`} />
+        <Row label="Контакт"  value={o.contact} />
         <Row label="Срочность" value={o.urgency === 'urgent' ? '⚡ Срочно' : '🕐 Обычная'} />
-        <Row label="Тип" value={o.order_type === 'group' ? '👥 Совместный' : '👤 Личный'} />
-        <Row label="Дата" value={new Date(o.created_at).toLocaleString('ru-RU')} />
-        {o.file_urls && o.file_urls.length > 0 && (
-          <div className="pt-2 space-y-1">
-            <span className="text-sm text-gray-500">Файлы</span>
-            <div className="flex flex-wrap gap-3 mt-1">
-              {o.file_urls.map((url, i) => (
-                <a key={i} href={url} target="_blank" rel="noopener"
-                  className="flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-red-600 hover:bg-gray-50">
-                  📎 Файл {i + 1}
-                </a>
-              ))}
+        <Row label="Тип"      value={o.order_type === 'group' ? '👥 Совместный' : '👤 Личный'} />
+        <Row label="Дата"     value={new Date(o.created_at).toLocaleString('ru-RU')} />
+      </div>
+
+      {/* Товары */}
+      <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="font-semibold text-gray-900 mb-4">
+          {items.length === 1 ? 'Товар' : `Товары (${items.length})`}
+        </h2>
+        <div className="space-y-5">
+          {items.map((item, idx) => (
+            <div key={idx} className={items.length > 1 ? 'pb-5 border-b border-gray-100 last:border-0 last:pb-0' : ''}>
+              {items.length > 1 && (
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
+                  Товар {idx + 1}
+                </p>
+              )}
+              <div className="space-y-2">
+                <Row label="Название" value={item.product_name} />
+                {item.description && <Row label="Описание" value={item.description} />}
+                {item.link && (
+                  <Row label="Ссылка" value={
+                    <a href={item.link} target="_blank" rel="noopener"
+                      className="text-red-600 hover:underline break-all">
+                      {item.link}
+                    </a>
+                  } />
+                )}
+                {item.file_urls && item.file_urls.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {item.file_urls.map((url, fi) => (
+                      <a key={fi} href={url} target="_blank" rel="noopener"
+                        className="flex items-center gap-1 rounded-lg border border-gray-200 px-3 py-1.5 text-sm text-red-600 hover:bg-gray-50">
+                        📎 Файл {fi + 1}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
       </div>
 
       {/* Редактор статуса */}

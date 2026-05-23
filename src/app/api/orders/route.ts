@@ -2,18 +2,30 @@ import { NextRequest, NextResponse } from 'next/server'
 import { adminClient } from '@/lib/supabase/admin'
 import { notifyNewOrder } from '@/lib/utils/telegram'
 import { orderSchema } from '@/lib/validations/order'
+import type { OrderItem } from '@/types'
 
-// Увеличиваем лимит времени Vercel (работает на Pro плане; на Hobby — 10s по умолчанию)
 export const maxDuration = 30
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024 // 8 MB
 
-/** Запускает промис, но гарантированно резолвится через timeoutMs — не блокирует ответ */
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | void> {
-  return Promise.race([
-    promise,
-    new Promise<void>(resolve => setTimeout(resolve, timeoutMs)),
-  ])
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | void> {
+  return Promise.race([promise, new Promise<void>(resolve => setTimeout(resolve, ms))])
+}
+
+/** Загружает один файл в Supabase Storage и возвращает публичный URL или null */
+async function uploadFile(file: File): Promise<string | null> {
+  if (!file.size || file.size > MAX_FILE_BYTES) return null
+  const ext  = file.name.split('.').pop() ?? 'bin'
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const { data: up, error } = await adminClient.storage
+    .from('orders-files')
+    .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false })
+  if (error || !up) {
+    console.error(`[orders] upload error for ${file.name}:`, error?.message)
+    return null
+  }
+  const { data: { publicUrl } } = adminClient.storage.from('orders-files').getPublicUrl(up.path)
+  return publicUrl
 }
 
 export async function POST(req: NextRequest) {
@@ -26,15 +38,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Не удалось прочитать данные формы' }, { status: 400 })
   }
 
+  // ── Валидируем личные данные + параметры ───────────────────────────────────
   const raw = {
-    first_name:   formData.get('first_name')   as string,
-    last_name:    formData.get('last_name')    as string,
-    contact:      formData.get('contact')      as string,
-    product_name: formData.get('product_name') as string,
-    description:  (formData.get('description') as string) || undefined,
-    link:         (formData.get('link')         as string) || undefined,
-    urgency:      formData.get('urgency')      as string,
-    order_type:   formData.get('order_type')   as string,
+    first_name:  formData.get('first_name')  as string,
+    last_name:   formData.get('last_name')   as string,
+    contact:     formData.get('contact')     as string,
+    urgency:     formData.get('urgency')     as string,
+    order_type:  formData.get('order_type')  as string,
   }
 
   const parsed = orderSchema.safeParse(raw)
@@ -42,67 +52,108 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 })
   }
 
-  // ── Загружаем файлы в Supabase Storage ────────────────────────────────────
-  const files = formData.getAll('files') as File[]
-  const fileUrls: string[] = []
+  // ── Парсим товары из JSON ───────────────────────────────────────────────────
+  const itemsJson = formData.get('items') as string | null
+  let itemsText: Array<{ product_name: string; description?: string; link?: string }> = []
 
-  for (const file of files) {
-    if (!file.size) continue
-
-    if (file.size > MAX_FILE_BYTES) {
-      console.warn(`[orders] Skipping oversized file: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`)
-      continue
-    }
-
-    const ext  = file.name.split('.').pop() ?? 'bin'
-    const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-
-    console.log(`[orders] Uploading ${file.name} (${(file.size / 1024).toFixed(0)} KB) → ${path}`)
-
-    const { data: up, error: uploadError } = await adminClient.storage
-      .from('orders-files')
-      .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false })
-
-    if (uploadError) {
-      console.error(`[orders] Storage upload error for ${file.name}:`, uploadError.message)
-      continue
-    }
-
-    if (up) {
-      const { data: { publicUrl } } = adminClient.storage.from('orders-files').getPublicUrl(up.path)
-      fileUrls.push(publicUrl)
-      console.log(`[orders] Uploaded → ${publicUrl}`)
+  if (itemsJson) {
+    try {
+      itemsText = JSON.parse(itemsJson)
+    } catch {
+      return NextResponse.json({ error: 'Невалидный формат товаров' }, { status: 400 })
     }
   }
 
-  // ── Создаём заявку в БД ────────────────────────────────────────────────────
-  console.log(`[orders] Inserting order for ${raw.first_name} ${raw.last_name}`)
+  // Обратная совместимость: старый формат без поля items
+  if (!itemsText.length) {
+    const product_name = formData.get('product_name') as string
+    if (product_name?.trim()) {
+      itemsText = [{
+        product_name,
+        description: (formData.get('description') as string) || undefined,
+        link:        (formData.get('link')         as string) || undefined,
+      }]
+    }
+  }
 
-  const { data: order, error } = await adminClient
+  if (!itemsText.length || !itemsText[0]?.product_name?.trim()) {
+    return NextResponse.json({ error: 'Добавьте хотя бы один товар' }, { status: 400 })
+  }
+
+  // ── Загружаем файлы каждого товара ────────────────────────────────────────
+  const items: OrderItem[] = await Promise.all(
+    itemsText.map(async (item, i) => {
+      const files    = formData.getAll(`files_${i}`) as File[]
+      const legacyFiles = i === 0 ? formData.getAll('files') as File[] : []
+      const allFiles = files.length > 0 ? files : legacyFiles
+
+      const fileUrls: string[] = []
+      for (const file of allFiles) {
+        const url = await uploadFile(file)
+        if (url) fileUrls.push(url)
+      }
+      console.log(`[orders] item ${i + 1}: "${item.product_name}", ${fileUrls.length} file(s)`)
+      return {
+        product_name: item.product_name,
+        description:  item.description || null,
+        link:         item.link        || null,
+        file_urls:    fileUrls,
+      }
+    }),
+  )
+
+  // Первый товар + все файлы для обратной совместимости с существующими полями
+  const firstItem   = items[0]
+  const allFileUrls = items.flatMap(it => it.file_urls ?? [])
+
+  // ── Создаём заявку ─────────────────────────────────────────────────────────
+  console.log(`[orders] Inserting order for ${raw.first_name} ${raw.last_name}, ${items.length} item(s)`)
+
+  const baseData = {
+    ...parsed.data,
+    product_name: firstItem.product_name,
+    description:  firstItem.description || null,
+    link:         firstItem.link        || null,
+    file_urls:    allFileUrls,
+  }
+
+  // Пробуем с колонкой items; если её нет — fallback без неё
+  let { data: order, error } = await adminClient
     .from('orders')
-    .insert({
-      ...parsed.data,
-      description: parsed.data.description || null,
-      link:        parsed.data.link        || null,
-      file_urls:   fileUrls,
-    })
+    .insert({ ...baseData, items })
     .select('*, statuses(*)')
     .single()
 
   if (error) {
-    console.error('[orders] DB insert error:', error.message)
-    return NextResponse.json({ error: 'Ошибка сохранения заявки. Попробуйте ещё раз.' }, { status: 500 })
+    // Код 42703 — column does not exist (миграция ещё не применена)
+    const isColMissing = error.code === '42703' ||
+      (error.message.includes('"items"') && error.message.includes('does not exist'))
+
+    if (isColMissing) {
+      console.warn('[orders] items column missing — falling back to insert without it')
+      const fallback = await adminClient
+        .from('orders')
+        .insert(baseData)
+        .select('*, statuses(*)')
+        .single()
+      if (fallback.error) {
+        console.error('[orders] DB insert error:', fallback.error.message)
+        return NextResponse.json({ error: 'Ошибка сохранения заявки. Попробуйте ещё раз.' }, { status: 500 })
+      }
+      order = fallback.data
+    } else {
+      console.error('[orders] DB insert error:', error.message)
+      return NextResponse.json({ error: 'Ошибка сохранения заявки. Попробуйте ещё раз.' }, { status: 500 })
+    }
   }
 
-  console.log(`[orders] Order created: ${order.code}`)
+  console.log(`[orders] Order created: ${order!.code}`)
 
-  // ── Telegram уведомление (await с таймаутом 5s) ──────────────────────────
-  // На Vercel Serverless функция замораживается после return — fire-and-forget
-  // не работает. Awaiting гарантирует доставку; maxDuration=30 даёт запас.
-  await withTimeout(notifyNewOrder(order), 5_000)
+  // ── Telegram уведомление ──────────────────────────────────────────────────
+  await withTimeout(notifyNewOrder(order!, items), 5_000)
     .catch(e => console.error('[orders] Telegram notification error:', e))
 
-  return NextResponse.json({ code: order.code })
+  return NextResponse.json({ code: order!.code })
 }
 
 export async function GET(req: NextRequest) {

@@ -3,7 +3,7 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import TrackTimeline from './TrackTimeline'
 import { adminClient } from '@/lib/supabase/admin'
-import type { Order, Status } from '@/types'
+import type { Order, OrderItem, Status } from '@/types'
 
 export default async function TrackCodePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
@@ -38,6 +38,12 @@ export default async function TrackCodePage({ params }: { params: Promise<{ code
   }
 
   const o = order as Order & { statuses: Status }
+
+  // Товары: items из БД или legacy-поля
+  const items: OrderItem[] =
+    o.items && o.items.length > 0
+      ? o.items
+      : [{ product_name: o.product_name, description: o.description, link: o.link, file_urls: o.file_urls }]
 
   return (
     <>
@@ -104,41 +110,57 @@ export default async function TrackCodePage({ params }: { params: Promise<{ code
                 <div className="space-y-3">
                   <Row label="Клиент"    value={`${o.first_name} ${o.last_name}`} />
                   <Row label="Контакт"   value={o.contact} />
-                  <Row label="Товар"     value={o.product_name} />
-                  {o.description && <Row label="Описание" value={o.description} />}
-                  {o.link && (
-                    <Row label="Ссылка" value={
-                      <a href={o.link} target="_blank" rel="noopener"
-                        className="break-all transition-colors"
-                        style={{ color: '#8B1A2F' }}
-                        onMouseEnter={e => (e.currentTarget.style.color = '#A52238')}
-                        onMouseLeave={e => (e.currentTarget.style.color = '#8B1A2F')}>
-                        {o.link}
-                      </a>
-                    } />
-                  )}
                   <Row label="Срочность" value={o.urgency === 'urgent' ? '⚡ Срочная' : '🕐 Обычная'} />
                   <Row label="Тип"       value={o.order_type === 'group' ? '👥 Совместный' : '👤 Личный'} />
                 </div>
               </div>
 
-              {o.file_urls && o.file_urls.length > 0 && (
-                <div className="glass rounded-3xl p-6">
-                  <h2 className="text-xs font-semibold uppercase tracking-widest mb-4"
-                    style={{ color: 'rgba(245,240,232,0.4)' }}>
-                    Файлы
-                  </h2>
-                  <div className="space-y-2">
-                    {o.file_urls.map((url, i) => (
-                      <a key={i} href={url} target="_blank" rel="noopener"
-                        className="flex items-center gap-2 text-sm transition-colors"
-                        style={{ color: 'rgba(245,240,232,0.55)' }}>
-                        <span style={{ color: '#8B1A2F' }}>📎</span> Файл {i + 1}
-                      </a>
-                    ))}
-                  </div>
+              {/* Товары */}
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-xs font-semibold uppercase tracking-widest mb-5"
+                  style={{ color: 'rgba(245,240,232,0.4)' }}>
+                  {items.length === 1 ? 'Товар' : `Товары · ${items.length}`}
+                </h2>
+                <div className="space-y-5">
+                  {items.map((item, idx) => (
+                    <div key={idx} className={items.length > 1 ? 'pb-5 border-b last:border-0 last:pb-0' : ''}
+                      style={{ borderColor: 'rgba(245,240,232,0.06)' }}>
+                      {items.length > 1 && (
+                        <p className="text-[10px] font-semibold uppercase tracking-widest mb-2"
+                          style={{ color: 'rgba(245,240,232,0.3)' }}>
+                          Товар {idx + 1}
+                        </p>
+                      )}
+                      <div className="space-y-2">
+                        <Row label="Название" value={item.product_name} />
+                        {item.description && <Row label="Описание" value={item.description} />}
+                        {item.link && (
+                          <Row label="Ссылка" value={
+                            <a href={item.link} target="_blank" rel="noopener"
+                              className="break-all transition-colors"
+                              style={{ color: '#8B1A2F' }}
+                              onMouseEnter={e => (e.currentTarget.style.color = '#A52238')}
+                              onMouseLeave={e => (e.currentTarget.style.color = '#8B1A2F')}>
+                              {item.link}
+                            </a>
+                          } />
+                        )}
+                        {item.file_urls && item.file_urls.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mt-1">
+                            {item.file_urls.map((url, fi) => (
+                              <a key={fi} href={url} target="_blank" rel="noopener"
+                                className="flex items-center gap-1.5 text-xs transition-colors"
+                                style={{ color: 'rgba(245,240,232,0.5)' }}>
+                                <span style={{ color: '#8B1A2F' }}>📎</span> Файл {fi + 1}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              )}
+              </div>
 
               <div className="pt-1">
                 <Link href="/track" className="text-sm transition-colors"

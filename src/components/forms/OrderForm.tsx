@@ -60,13 +60,6 @@ export default function OrderForm() {
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
-        <h2 className="font-semibold text-gray-900">Товар</h2>
-        <Input label="Название товара" required {...register('product_name')} error={errors.product_name?.message} />
-        <Textarea label="Описание (цвет, размер, количество и т.д.)" {...register('description')} error={errors.description?.message} />
-        <Input label="Ссылка на товар" placeholder="https://..." {...register('link')} error={errors.link?.message} />
-      </section>
-
-      <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
         <h2 className="font-semibold text-gray-900">Параметры заказа</h2>
 
         <div>
