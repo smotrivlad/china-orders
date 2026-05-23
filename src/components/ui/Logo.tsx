@@ -8,7 +8,7 @@ export default function Logo({ className = '' }: { className?: string }) {
         alt=""
         width={40}
         height={40}
-        style={{ objectFit: 'contain', flexShrink: 0, mixBlendMode: 'screen', display: 'block' }}
+        style={{ objectFit: 'contain', flexShrink: 0 }}
       />
       <div className="flex flex-col leading-none">
         <span className="font-bold text-base" style={{ color: '#F5F0E8', letterSpacing: '0.18em' }}>
