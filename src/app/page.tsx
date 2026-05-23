@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import WindIcon from '@/components/ui/WindIcon'
 
 const SERVICES = [
   {
@@ -39,6 +40,39 @@ const STATS = [
   { val: '3 года', label: 'На рынке' },
 ]
 
+/* Radiating thin lines around the wind logo */
+function RadiatingBurst() {
+  return (
+    <svg
+      className="absolute pointer-events-none"
+      style={{ width: 200, height: 160, left: -30, top: -48, zIndex: 0 }}
+      viewBox="0 0 200 160"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      {Array.from({ length: 18 }, (_, i) => {
+        const angle = (i * 20 * Math.PI) / 180
+        const cx = 100
+        const cy = 80
+        return (
+          <line
+            key={i}
+            x1={cx + 28 * Math.cos(angle)}
+            y1={cy + 28 * Math.sin(angle)}
+            x2={cx + 90 * Math.cos(angle)}
+            y2={cy + 90 * Math.sin(angle)}
+            stroke="#8B1A2F"
+            strokeWidth="0.6"
+            strokeOpacity="0.22"
+          />
+        )
+      })}
+      <ellipse cx="100" cy="80" rx="54" ry="40" stroke="#8B1A2F" strokeWidth="0.5" strokeOpacity="0.15" />
+    </svg>
+  )
+}
+
 export default function HomePage() {
   return (
     <>
@@ -46,85 +80,89 @@ export default function HomePage() {
 
       {/* ── HERO ──────────────────────────────────────────── */}
       <section className="relative min-h-screen flex items-center overflow-hidden pt-20">
-        {/* Background layers */}
+        {/* Background grid */}
         <div className="absolute inset-0 bg-grid opacity-100" />
-        <div className="orb w-[600px] h-[600px] bg-burgundy/10 top-[-200px] right-[-200px]" />
-        <div className="orb w-[400px] h-[400px] bg-burgundy/8 bottom-[-100px] left-[-100px]" />
+        {/* Burgundy orbs */}
+        <div
+          className="orb w-[700px] h-[700px] top-[-250px] right-[-180px]"
+          style={{ background: 'rgba(139,26,47,0.07)' }}
+        />
+        <div
+          className="orb w-[450px] h-[450px] bottom-[-120px] left-[-120px]"
+          style={{ background: 'rgba(139,26,47,0.05)' }}
+        />
 
-        <div className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 w-full py-20">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            {/* Left */}
-            <div>
-              <div className="section-label mb-6">Прямые поставки из Китая</div>
-              <h1 className="font-display text-5xl sm:text-6xl xl:text-7xl font-bold leading-[1.05] tracking-tight">
-                <span className="text-milk">EAST</span>
-                <span className="text-gradient-burgundy">WIND</span>
+        <div className="relative z-10 mx-auto max-w-6xl px-4 sm:px-6 w-full py-20">
+          <div className="flex flex-col items-center text-center">
+
+            {/* Label */}
+            <div className="section-label justify-center mb-6">Прямые поставки из Китая</div>
+
+            {/* ── Brand name  +  Wind logo (справа от названия) ── */}
+            <div className="flex items-end justify-center gap-5 sm:gap-8 mb-6 flex-wrap">
+              <h1 className="font-display leading-[1.04] tracking-tight" style={{ fontSize: 'clamp(2.8rem, 8vw, 5.5rem)' }}>
+                <span style={{ color: '#F5F0E8' }}>EAST</span>
+                <span style={{ color: '#8B1A2F' }}>WIND</span>
                 <br />
-                <span className="text-milk/80 text-4xl sm:text-5xl xl:text-6xl">LOGISTIC</span>
+                <span
+                  className="font-bold tracking-widest"
+                  style={{ color: 'rgba(245,240,232,0.6)', fontSize: '0.52em', letterSpacing: '0.28em' }}
+                >
+                  LOGISTIC
+                </span>
               </h1>
-              <p className="mt-6 text-milk/55 text-lg leading-relaxed max-w-lg">
-                Надёжная доставка товаров из Китая для бизнеса и частных лиц.
-                Отслеживание в реальном времени — вы знаете, где ваш груз.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-4">
-                <Link href="/order" className="btn-primary">
-                  Оформить заявку →
-                </Link>
-                <Link href="/track" className="btn-outline">
-                  Отследить посылку
-                </Link>
-              </div>
 
-              {/* Stats row */}
-              <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-6">
-                {STATS.map((s) => (
-                  <div key={s.label}>
-                    <div className="font-display text-2xl font-bold text-milk">{s.val}</div>
-                    <div className="text-xs text-milk/40 mt-0.5 leading-snug">{s.label}</div>
-                  </div>
-                ))}
+              {/* Wind icon with glow + radiating burst */}
+              <div className="relative flex-shrink-0 mb-2">
+                {/* Radial glow backdrop */}
+                <div
+                  className="absolute rounded-full pointer-events-none"
+                  style={{
+                    width: 180,
+                    height: 145,
+                    left: -25,
+                    top: -32,
+                    background: 'radial-gradient(ellipse, rgba(139,26,47,0.22) 0%, transparent 68%)',
+                  }}
+                />
+                {/* Radiating thin lines */}
+                <RadiatingBurst />
+                {/* The logo SVG */}
+                <WindIcon
+                  size={96}
+                  className="relative z-10 logo-glow-lg"
+                  style={{ color: '#8B1A2F' }}
+                />
               </div>
             </div>
 
-            {/* Right – logo visual */}
-            <div className="hidden lg:flex items-center justify-center">
-              <div className="relative w-80 h-80">
-                {/* Rotating outer ring */}
-                <div className="absolute inset-0 rounded-full animate-spin-slow"
-                  style={{ border: '1px solid rgba(139,26,47,0.2)' }} />
-                <div className="absolute inset-8 rounded-full"
-                  style={{ border: '1px solid rgba(245,240,232,0.05)' }} />
-                {/* Glow */}
-                <div className="absolute inset-0 rounded-full"
-                  style={{ background: 'radial-gradient(circle, rgba(139,26,47,0.12) 0%, transparent 70%)' }} />
-                {/* Center logo */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="animate-float">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/logo.png"
-                      alt="EASTWIND LOGISTIC"
-                      width={200}
-                      height={200}
-                      className="rounded-3xl"
-                      style={{ boxShadow: '0 0 60px rgba(139,26,47,0.35)' }}
-                    />
+            <p className="text-milk/50 leading-relaxed max-w-xl mb-8" style={{ fontSize: '1.05rem' }}>
+              Надёжная доставка товаров из Китая для бизнеса и частных лиц.
+              Отслеживание в реальном времени — вы знаете, где ваш груз.
+            </p>
+
+            <div className="flex flex-wrap gap-4 justify-center mb-14">
+              <Link href="/order" className="btn-primary">
+                Оформить заявку →
+              </Link>
+              <Link href="/track" className="btn-outline">
+                Отследить посылку
+              </Link>
+            </div>
+
+            {/* Stats */}
+            <div
+              className="grid grid-cols-2 sm:grid-cols-4 gap-8 sm:gap-16 pt-10 w-full max-w-2xl"
+              style={{ borderTop: '1px solid rgba(245,240,232,0.06)' }}
+            >
+              {STATS.map((s) => (
+                <div key={s.label} className="text-center">
+                  <div className="font-display text-2xl text-milk">{s.val}</div>
+                  <div className="text-xs mt-1 leading-snug" style={{ color: 'rgba(245,240,232,0.38)' }}>
+                    {s.label}
                   </div>
                 </div>
-                {/* Orbiting dots */}
-                {[0, 120, 240].map((deg, i) => (
-                  <div
-                    key={i}
-                    className="absolute w-2.5 h-2.5 rounded-full animate-float-slow"
-                    style={{
-                      background: '#8B1A2F',
-                      top: `${50 - 48 * Math.cos((deg * Math.PI) / 180)}%`,
-                      left: `${50 + 48 * Math.sin((deg * Math.PI) / 180)}%`,
-                      animationDelay: `${i * 0.8}s`,
-                    }}
-                  />
-                ))}
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -135,21 +173,28 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <div className="section-label justify-center mb-4">Что мы делаем</div>
-            <h2 className="font-display text-4xl sm:text-5xl font-bold text-milk">Наши услуги</h2>
+            <h2 className="font-display text-4xl sm:text-5xl text-milk">Наши услуги</h2>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {SERVICES.map((s, i) => (
               <div
                 key={i}
-                className="glass rounded-2xl p-6 group hover:-translate-y-1 hover:border-burgundy/30 transition-all duration-300"
+                className="glass rounded-2xl p-6 group hover:-translate-y-1 transition-all duration-300"
                 style={{ animationDelay: `${i * 0.1}s` }}
               >
-                <div className="w-12 h-12 rounded-xl bg-burgundy/15 flex items-center justify-center text-2xl mb-4 group-hover:bg-burgundy/25 transition-colors">
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center text-xl mb-4 transition-colors"
+                  style={{ background: 'rgba(139,26,47,0.13)' }}
+                >
                   {s.icon}
                 </div>
-                <h3 className="font-semibold text-milk mb-2">{s.title}</h3>
-                <p className="text-sm text-milk/45 leading-relaxed">{s.desc}</p>
+                <h3 className="font-semibold text-milk mb-2 text-sm tracking-wide uppercase" style={{ letterSpacing: '0.06em' }}>
+                  {s.title}
+                </h3>
+                <p className="text-sm leading-relaxed" style={{ color: 'rgba(245,240,232,0.42)' }}>
+                  {s.desc}
+                </p>
               </div>
             ))}
           </div>
@@ -161,21 +206,39 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="text-center mb-16">
             <div className="section-label justify-center mb-4">Процесс</div>
-            <h2 className="font-display text-4xl sm:text-5xl font-bold text-milk">Как мы работаем</h2>
+            <h2 className="font-display text-4xl sm:text-5xl text-milk">Как мы работаем</h2>
           </div>
 
           <div className="relative">
             {/* Connector line */}
-            <div className="hidden lg:block absolute top-10 left-[12.5%] right-[12.5%] h-px bg-gradient-to-r from-transparent via-burgundy/30 to-transparent" />
+            <div
+              className="hidden lg:block absolute top-[38px] left-[12.5%] right-[12.5%] h-px"
+              style={{ background: 'linear-gradient(to right, transparent, rgba(139,26,47,0.25), transparent)' }}
+            />
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
               {STEPS.map((step, i) => (
                 <div key={i} className="relative text-center lg:text-left">
-                  <div className="inline-flex items-center justify-center w-20 h-20 rounded-full border border-burgundy/30 bg-burgundy/10 mb-5 lg:mx-0 mx-auto">
-                    <span className="font-display text-xl font-bold text-burgundy">{step.num}</span>
+                  <div
+                    className="inline-flex items-center justify-center w-[76px] h-[76px] rounded-full mb-5 lg:mx-0 mx-auto"
+                    style={{
+                      border: '1px solid rgba(139,26,47,0.3)',
+                      background: 'rgba(139,26,47,0.08)',
+                    }}
+                  >
+                    <span
+                      className="font-display text-lg font-bold"
+                      style={{ color: '#8B1A2F' }}
+                    >
+                      {step.num}
+                    </span>
                   </div>
-                  <h3 className="font-semibold text-milk mb-2">{step.title}</h3>
-                  <p className="text-sm text-milk/45 leading-relaxed">{step.desc}</p>
+                  <h3 className="font-semibold text-milk mb-2 tracking-wide text-sm" style={{ letterSpacing: '0.05em' }}>
+                    {step.title}
+                  </h3>
+                  <p className="text-sm leading-relaxed" style={{ color: 'rgba(245,240,232,0.42)' }}>
+                    {step.desc}
+                  </p>
                 </div>
               ))}
             </div>
@@ -186,20 +249,35 @@ export default function HomePage() {
       {/* ── CTA ────────────────────────────────────────────── */}
       <section className="py-24 mx-4 sm:mx-6">
         <div className="mx-auto max-w-4xl rounded-3xl overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-br from-burgundy via-burgundy/90 to-navy" />
+          <div
+            className="absolute inset-0"
+            style={{ background: 'linear-gradient(135deg, #8B1A2F 0%, #6B1424 60%, #111C33 100%)' }}
+          />
           <div className="absolute inset-0 bg-grid opacity-10" />
+          {/* Decorative wind icon bottom-right */}
+          <div className="absolute bottom-[-20px] right-[-20px] opacity-10 pointer-events-none">
+            <WindIcon size={160} style={{ color: '#F5F0E8' }} />
+          </div>
           <div className="relative z-10 px-8 py-16 text-center">
-            <h2 className="font-display text-4xl sm:text-5xl font-bold text-milk mb-4">
+            <h2 className="font-display text-4xl sm:text-5xl text-milk mb-4">
               Готовы сделать заказ?
             </h2>
-            <p className="text-milk/70 text-lg mb-8 max-w-lg mx-auto">
+            <p className="text-lg mb-8 max-w-lg mx-auto" style={{ color: 'rgba(245,240,232,0.65)' }}>
               Оставьте заявку — мы свяжемся в течение 30 минут и уточним все детали.
             </p>
             <div className="flex flex-wrap gap-4 justify-center">
-              <Link href="/order" className="btn-outline border-milk/40 hover:bg-milk/10 text-milk">
+              <Link
+                href="/order"
+                className="btn-outline"
+                style={{ borderColor: 'rgba(245,240,232,0.35)' }}
+              >
                 Оформить заявку →
               </Link>
-              <Link href="/track" className="btn-outline border-milk/20 hover:bg-milk/5 text-milk/70">
+              <Link
+                href="/track"
+                className="btn-outline"
+                style={{ borderColor: 'rgba(245,240,232,0.15)', color: 'rgba(245,240,232,0.65)' }}
+              >
                 Отследить заявку
               </Link>
             </div>
