@@ -1,56 +1,96 @@
 import Link from 'next/link'
-import Header from '@/components/layout/Header'
-import Button from '@/components/ui/Button'
+import Navbar from '@/components/layout/Navbar'
 
 const BOT_USERNAME = 'chinaorders_notify_bot'
 
-export default async function SuccessPage({ searchParams }: { searchParams: Promise<{ code?: string }> }) {
+export default async function SuccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>
+}) {
   const { code } = await searchParams
+
   return (
     <>
-      <Header showTrack={false} />
-      <main className="mx-auto max-w-md px-4 py-16 text-center">
-        <div className="mb-6 text-6xl">✅</div>
-        <h1 className="text-2xl font-bold text-gray-900">Заявка принята!</h1>
-        {code && (
-          <p className="mt-3 text-gray-600">
-            Ваш номер заявки:{' '}
-            <span className="font-mono font-bold text-red-600 text-lg">{code}</span>
-          </p>
-        )}
-        <p className="mt-2 text-sm text-gray-500">Сохраните номер — он нужен для отслеживания статуса</p>
+      <Navbar />
+      <main className="relative min-h-screen flex items-center justify-center pt-20 pb-20 overflow-hidden">
+        <div className="absolute inset-0 bg-grid" />
+        <div className="orb w-[400px] h-[400px] top-0 right-[-100px]"
+          style={{ background: 'rgba(139,26,47,0.08)' }} />
 
-        {/* Telegram уведомления */}
-        {code && (
-          <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-5 text-left">
-            <p className="font-semibold text-blue-900 text-sm">📱 Уведомления в Telegram</p>
-            <p className="mt-1 text-sm text-blue-700">
-              Нажмите кнопку ниже — бот автоматически подпишет вас на обновления по заявке.
-              Как только статус изменится, вы сразу узнаете.
-            </p>
-            <a
-              href={`https://t.me/${BOT_USERNAME}?start=${code}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-3 flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-sm font-medium text-white hover:bg-blue-600 transition-colors"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-                <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248-1.97 9.289c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.048 13.84l-2.948-.924c-.64-.203-.653-.64.136-.953l11.57-4.461c.532-.194 1.00.13.756.746z"/>
-              </svg>
-              Подписаться на уведомления
-            </a>
+        <div className="relative z-10 w-full max-w-lg mx-auto px-4 text-center">
+          {/* Icon */}
+          <div className="mb-8 inline-flex items-center justify-center w-20 h-20 rounded-full"
+            style={{ background: 'rgba(139,26,47,0.15)', border: '1px solid rgba(139,26,47,0.3)' }}>
+            <svg viewBox="0 0 24 24" fill="none" className="w-9 h-9"
+              stroke="#8B1A2F" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 13l4 4L19 7" />
+            </svg>
           </div>
-        )}
 
-        <div className="mt-6 flex flex-col gap-3">
+          <h1 className="font-display text-4xl font-bold" style={{ color: '#F5F0E8' }}>
+            Заявка принята!
+          </h1>
+
           {code && (
-            <Link href={`/track/${code}`}>
-              <Button className="w-full">Отследить заявку</Button>
-            </Link>
+            <div className="mt-6 glass rounded-2xl px-8 py-5 inline-block">
+              <p className="text-xs uppercase tracking-widest mb-2" style={{ color: 'rgba(245,240,232,0.4)' }}>
+                Номер заявки
+              </p>
+              <p className="font-mono font-bold text-3xl" style={{ color: '#F5F0E8' }}>
+                {code}
+              </p>
+            </div>
           )}
-          <Link href="/order">
-            <Button variant="secondary" className="w-full">Оформить ещё одну</Button>
-          </Link>
+
+          <p className="mt-6 text-base leading-relaxed max-w-sm mx-auto"
+            style={{ color: 'rgba(245,240,232,0.5)' }}>
+            Сохраните номер — он нужен для отслеживания.
+            Свяжемся с вами в течение 30 минут.
+          </p>
+
+          {/* Telegram */}
+          {code && (
+            <div className="mt-8 glass rounded-2xl p-6 text-left">
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                  style={{ background: 'rgba(34,158,217,0.15)' }}>
+                  <svg viewBox="0 0 24 24" fill="#229ED9" className="w-5 h-5">
+                    <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248-1.97 9.289c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.048 13.84l-2.948-.924c-.64-.203-.653-.64.136-.953l11.57-4.461c.532-.194 1.00.13.756.746z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold" style={{ color: '#F5F0E8' }}>
+                    Уведомления в Telegram
+                  </p>
+                  <p className="text-sm mt-1" style={{ color: 'rgba(245,240,232,0.5)' }}>
+                    Подпишитесь на бота — как только статус изменится, вы сразу узнаете.
+                  </p>
+                  <a
+                    href={`https://t.me/${BOT_USERNAME}?start=${code}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-3 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition-colors"
+                    style={{ background: '#229ED9' }}
+                  >
+                    Подписаться на уведомления
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
+            {code && (
+              <Link href={`/track/${code}`} className="btn-primary">
+                Отследить заявку →
+              </Link>
+            )}
+            <Link href="/order" className="btn-outline">
+              Ещё одна заявка
+            </Link>
+          </div>
         </div>
       </main>
     </>

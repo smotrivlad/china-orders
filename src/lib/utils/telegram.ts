@@ -1,6 +1,6 @@
 import type { Order } from '@/types'
 
-const isImage = (url: string) => /\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(url)
+const isImageUrl = (url: string) => /\.(jpe?g|png|gif|webp)(\?.*)?$/i.test(url)
 
 export async function tg(token: string, method: string, body: object) {
   return fetch(`https://api.telegram.org/bot${token}/${method}`, {
@@ -10,27 +10,51 @@ export async function tg(token: string, method: string, body: object) {
   })
 }
 
-async function sendFiles(token: string, chatId: string, fileUrls: string[]) {
+/**
+ * Отправляет файлы в Telegram по публичным URL Supabase Storage.
+ * Бакет orders-files должен быть public=true (проверено).
+ * Каждый файл отправляется отдельным сообщением: фото → sendPhoto, остальное → sendDocument.
+ */
+async function sendFilesByUrl(token: string, chatId: string, fileUrls: string[]) {
   if (!fileUrls.length) return
-  const photos = fileUrls.filter(isImage)
-  const docs = fileUrls.filter((u) => !isImage(u))
 
+  const photos = fileUrls.filter(isImageUrl)
+  const docs   = fileUrls.filter(u => !isImageUrl(u))
+
+  // Фото — одним альбомом если их несколько, иначе по одному
   if (photos.length === 1) {
-    await tg(token, 'sendPhoto', { chat_id: chatId, photo: photos[0] })
+    const res = await tg(token, 'sendPhoto', { chat_id: chatId, photo: photos[0] })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      console.error('sendPhoto failed:', JSON.stringify(err))
+    }
   } else if (photos.length > 1) {
-    await tg(token, 'sendMediaGroup', {
+    const res = await tg(token, 'sendMediaGroup', {
       chat_id: chatId,
-      media: photos.map((url) => ({ type: 'photo', media: url })),
+      media: photos.map(url => ({ type: 'photo', media: url })),
     })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      console.error('sendMediaGroup photos failed:', JSON.stringify(err))
+    }
   }
 
+  // Документы
   if (docs.length === 1) {
-    await tg(token, 'sendDocument', { chat_id: chatId, document: docs[0] })
+    const res = await tg(token, 'sendDocument', { chat_id: chatId, document: docs[0] })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      console.error('sendDocument failed:', JSON.stringify(err))
+    }
   } else if (docs.length > 1) {
-    await tg(token, 'sendMediaGroup', {
+    const res = await tg(token, 'sendMediaGroup', {
       chat_id: chatId,
-      media: docs.map((url) => ({ type: 'document', media: url })),
+      media: docs.map(url => ({ type: 'document', media: url })),
     })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      console.error('sendMediaGroup docs failed:', JSON.stringify(err))
+    }
   }
 }
 
@@ -43,9 +67,11 @@ export function buildContactButton(orderId: string, contact: string) {
 }
 
 export async function notifyNewOrder(order: Order) {
-  const token = process.env.TELEGRAM_BOT_TOKEN
+  const token  = process.env.TELEGRAM_BOT_TOKEN
   const chatId = process.env.TELEGRAM_CHAT_ID
   if (!token || !chatId) return
+
+  const fileCount = order.file_urls?.length ?? 0
 
   const lines = [
     `🆕 <b>Новая заявка ${order.code}</b>`,
@@ -55,12 +81,13 @@ export async function notifyNewOrder(order: Order) {
     '',
     `📦 <b>Товар:</b> ${order.product_name}`,
     order.description ? `📝 <b>Описание:</b> ${order.description}` : null,
-    order.link ? `🔗 <b>Ссылка:</b> ${order.link}` : null,
+    order.link        ? `🔗 <b>Ссылка:</b> ${order.link}`          : null,
     '',
-    order.urgency === 'urgent' ? '⚡ Срочный заказ' : '🕐 Обычная срочность',
-    order.order_type === 'group' ? '👥 Совместный заказ' : '👤 Личный заказ',
+    order.urgency    === 'urgent' ? '⚡ Срочный заказ'    : '🕐 Обычная срочность',
+    order.order_type === 'group'  ? '👥 Совместный заказ' : '👤 Личный заказ',
+    fileCount > 0 ? `📎 Прикреплено файлов: ${fileCount}` : null,
   ]
-    .filter((l) => l !== null)
+    .filter(l => l !== null)
     .join('\n')
 
   await tg(token, 'sendMessage', {
@@ -70,15 +97,16 @@ export async function notifyNewOrder(order: Order) {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: '✅ Принять в работу', callback_data: `s|${order.id}|in_progress` },
-          { text: '🔍 Ищем поставщика', callback_data: `s|${order.id}|searching_supplier` },
+          { text: '✅ Принять в работу', callback_data: `s|${order.id}|in_progress`        },
+          { text: '🔍 Ищем поставщика',  callback_data: `s|${order.id}|searching_supplier` },
         ],
         [buildContactButton(order.id, order.contact)],
       ],
     },
   })
 
-  if (order.file_urls?.length) {
-    await sendFiles(token, chatId, order.file_urls)
+  // Отправляем файлы по публичным URL из Supabase Storage
+  if (fileCount > 0) {
+    await sendFilesByUrl(token, chatId, order.file_urls!)
   }
 }

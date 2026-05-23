@@ -1,24 +1,13 @@
 import Link from 'next/link'
-import Header from '@/components/layout/Header'
-import Badge from '@/components/ui/Badge'
+import Navbar from '@/components/layout/Navbar'
+import Footer from '@/components/layout/Footer'
+import TrackTimeline from './TrackTimeline'
 import { adminClient } from '@/lib/supabase/admin'
 import type { Order, Status } from '@/types'
 
-const ALL_STATUSES: { code: string; name: string }[] = [
-  { code: 'new', name: 'Новая' },
-  { code: 'in_progress', name: 'Принята в работу' },
-  { code: 'searching_supplier', name: 'Ищем поставщика' },
-  { code: 'supplier_found', name: 'Найден поставщик' },
-  { code: 'purchase', name: 'Выкуп' },
-  { code: 'shipping', name: 'Едет в Россию' },
-  { code: 'ready_for_pickup', name: 'Готово к выдаче' },
-  { code: 'completed', name: 'Завершена' },
-]
-
-const statusOrder: Record<string, number> = Object.fromEntries(ALL_STATUSES.map((s, i) => [s.code, i]))
-
 export default async function TrackCodePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
+
   const { data: order, error } = await adminClient
     .from('orders')
     .select('*, statuses(*)')
@@ -28,94 +17,154 @@ export default async function TrackCodePage({ params }: { params: Promise<{ code
   if (error || !order) {
     return (
       <>
-        <Header />
-        <main className="mx-auto max-w-md px-4 py-20 text-center">
-          <div className="text-5xl mb-4">😔</div>
-          <h1 className="text-xl font-bold text-gray-900">Заявка не найдена</h1>
-          <p className="mt-2 text-gray-500">Проверьте номер и попробуйте снова</p>
-          <Link href="/track" className="mt-6 inline-block text-red-600 hover:underline">← Попробовать снова</Link>
+        <Navbar />
+        <main className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
+          <div className="absolute inset-0 bg-grid" />
+          <div className="relative z-10 text-center px-4">
+            <div className="text-5xl mb-6">🔍</div>
+            <h1 className="font-display text-3xl font-bold" style={{ color: '#F5F0E8' }}>
+              Заявка не найдена
+            </h1>
+            <p className="mt-3" style={{ color: 'rgba(245,240,232,0.5)' }}>
+              Проверьте номер и попробуйте снова
+            </p>
+            <Link href="/track" className="btn-outline mt-8 inline-flex">
+              ← Попробовать снова
+            </Link>
+          </div>
         </main>
       </>
     )
   }
 
   const o = order as Order & { statuses: Status }
-  const currentIdx = statusOrder[o.statuses.code] ?? 0
 
   return (
     <>
-      <Header />
-      <main className="mx-auto max-w-2xl px-4 py-10">
-        <div className="mb-6 flex items-start justify-between">
-          <div>
-            <p className="text-sm text-gray-500">Номер заявки</p>
-            <h1 className="text-2xl font-bold font-mono text-gray-900">{o.code}</h1>
+      <Navbar />
+      <main className="relative min-h-screen pt-28 pb-20 overflow-hidden">
+        <div className="absolute inset-0 bg-grid" />
+        <div className="orb w-[400px] h-[400px] top-0 right-[-100px]"
+          style={{ background: 'rgba(139,26,47,0.08)' }} />
+
+        <div className="relative z-10 mx-auto max-w-5xl px-4 sm:px-6">
+          {/* Header */}
+          <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <div className="section-label mb-3">Отслеживание</div>
+              <h1 className="font-display text-4xl font-bold" style={{ color: '#F5F0E8' }}>
+                {o.code}
+              </h1>
+              <p className="mt-1 text-sm" style={{ color: 'rgba(245,240,232,0.4)' }}>
+                Создана {new Date(o.created_at).toLocaleDateString('ru-RU', {
+                  day: 'numeric', month: 'long', year: 'numeric',
+                })}
+              </p>
+            </div>
+            <div className="glass rounded-2xl px-5 py-3 text-right shrink-0">
+              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(245,240,232,0.4)' }}>
+                Статус
+              </p>
+              <p className="text-sm font-semibold" style={{ color: '#F5F0E8' }}>
+                {o.statuses.name}
+              </p>
+            </div>
           </div>
-          <Badge code={o.statuses.code} name={o.statuses.name} />
-        </div>
 
-        {/* Timeline */}
-        <div className="mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 font-semibold text-gray-900">Статус</h2>
-          <ol className="space-y-3">
-            {ALL_STATUSES.map((s, i) => {
-              const done = i < currentIdx
-              const active = i === currentIdx
-              return (
-                <li key={s.code} className="flex items-center gap-3">
-                  <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold
-                    ${active ? 'bg-red-600 text-white' : done ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                    {done ? '✓' : i + 1}
-                  </span>
-                  <span className={`text-sm ${active ? 'font-semibold text-gray-900' : done ? 'text-gray-500' : 'text-gray-400'}`}>
-                    {s.name}
-                  </span>
-                </li>
-              )
-            })}
-          </ol>
-        </div>
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* Timeline */}
+            <div className="lg:col-span-2 glass rounded-3xl p-7">
+              <h2 className="text-xs font-semibold uppercase tracking-widest mb-6"
+                style={{ color: 'rgba(245,240,232,0.4)' }}>
+                Прогресс
+              </h2>
+              <TrackTimeline order={o} />
+            </div>
 
-        {/* Order details */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-3">
-          <h2 className="font-semibold text-gray-900">Детали заявки</h2>
-          <Row label="Клиент" value={`${o.first_name} ${o.last_name}`} />
-          <Row label="Контакт" value={o.contact} />
-          <Row label="Товар" value={o.product_name} />
-          {o.description && <Row label="Описание" value={o.description} />}
-          {o.link && <Row label="Ссылка" value={<a href={o.link} target="_blank" rel="noopener" className="text-red-600 hover:underline break-all">{o.link}</a>} />}
-          <Row label="Срочность" value={o.urgency === 'urgent' ? '⚡ Срочно' : '🕐 Обычная'} />
-          <Row label="Тип" value={o.order_type === 'group' ? '👥 Совместный' : '👤 Личный'} />
-          <Row label="Дата" value={new Date(o.created_at).toLocaleDateString('ru-RU')} />
-        </div>
+            {/* Details */}
+            <div className="lg:col-span-3 space-y-4">
+              {o.manager_comment && (
+                <div className="glass rounded-3xl p-6"
+                  style={{ borderColor: 'rgba(139,26,47,0.25)' }}>
+                  <p className="text-xs font-semibold uppercase tracking-widest mb-2"
+                    style={{ color: 'rgba(139,26,47,0.8)' }}>
+                    Комментарий менеджера
+                  </p>
+                  <p className="text-sm leading-relaxed" style={{ color: 'rgba(245,240,232,0.8)' }}>
+                    {o.manager_comment}
+                  </p>
+                </div>
+              )}
 
-        {o.manager_comment && (
-          <div className="mt-4 rounded-2xl border border-blue-200 bg-blue-50 p-4">
-            <p className="text-xs font-medium text-blue-600 mb-1">Комментарий менеджера</p>
-            <p className="text-sm text-blue-900">{o.manager_comment}</p>
+              <div className="glass rounded-3xl p-6">
+                <h2 className="text-xs font-semibold uppercase tracking-widest mb-5"
+                  style={{ color: 'rgba(245,240,232,0.4)' }}>
+                  Детали заявки
+                </h2>
+                <div className="space-y-3">
+                  <Row label="Клиент"    value={`${o.first_name} ${o.last_name}`} />
+                  <Row label="Контакт"   value={o.contact} />
+                  <Row label="Товар"     value={o.product_name} />
+                  {o.description && <Row label="Описание" value={o.description} />}
+                  {o.link && (
+                    <Row label="Ссылка" value={
+                      <a href={o.link} target="_blank" rel="noopener"
+                        className="break-all transition-colors"
+                        style={{ color: '#8B1A2F' }}
+                        onMouseEnter={e => (e.currentTarget.style.color = '#A52238')}
+                        onMouseLeave={e => (e.currentTarget.style.color = '#8B1A2F')}>
+                        {o.link}
+                      </a>
+                    } />
+                  )}
+                  <Row label="Срочность" value={o.urgency === 'urgent' ? '⚡ Срочная' : '🕐 Обычная'} />
+                  <Row label="Тип"       value={o.order_type === 'group' ? '👥 Совместный' : '👤 Личный'} />
+                </div>
+              </div>
+
+              {o.file_urls && o.file_urls.length > 0 && (
+                <div className="glass rounded-3xl p-6">
+                  <h2 className="text-xs font-semibold uppercase tracking-widest mb-4"
+                    style={{ color: 'rgba(245,240,232,0.4)' }}>
+                    Файлы
+                  </h2>
+                  <div className="space-y-2">
+                    {o.file_urls.map((url, i) => (
+                      <a key={i} href={url} target="_blank" rel="noopener"
+                        className="flex items-center gap-2 text-sm transition-colors"
+                        style={{ color: 'rgba(245,240,232,0.55)' }}>
+                        <span style={{ color: '#8B1A2F' }}>📎</span> Файл {i + 1}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="pt-1">
+                <Link href="/track" className="text-sm transition-colors"
+                  style={{ color: 'rgba(245,240,232,0.4)' }}>
+                  ← Отследить другую заявку
+                </Link>
+              </div>
+            </div>
           </div>
-        )}
-
-        {o.file_urls && o.file_urls.length > 0 && (
-          <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 space-y-2">
-            <p className="text-sm font-medium text-gray-700">Файлы</p>
-            {o.file_urls.map((url, i) => (
-              <a key={i} href={url} target="_blank" rel="noopener" className="flex items-center gap-2 text-sm text-red-600 hover:underline">
-                📎 Файл {i + 1}
-              </a>
-            ))}
-          </div>
-        )}
+        </div>
       </main>
+      <Footer />
     </>
   )
 }
 
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex gap-3">
-      <span className="w-28 shrink-0 text-sm text-gray-500">{label}</span>
-      <span className="text-sm text-gray-900">{value}</span>
+    <div className="flex gap-4">
+      <span className="w-24 shrink-0 text-xs uppercase tracking-wider leading-5 pt-0.5"
+        style={{ color: 'rgba(245,240,232,0.35)' }}>
+        {label}
+      </span>
+      <span className="text-sm flex-1" style={{ color: 'rgba(245,240,232,0.7)' }}>
+        {value}
+      </span>
     </div>
   )
 }
