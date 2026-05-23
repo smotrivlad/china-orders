@@ -107,17 +107,16 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Уведомляем клиента если подписан
-    if (order?.client_chat_id) {
-      notifyClientStatusChange({
-        clientChatId: order.client_chat_id,
-        firstName: order.first_name,
-        orderCode: order.code,
-        statusCode,
-        statusName: status.name,
-        managerComment: order.manager_comment,
-      }).catch(console.error)
-    }
+    // Уведомляем клиента (по chat_id или @username)
+    notifyClientStatusChange({
+      clientChatId: order.client_chat_id,
+      contact: order.contact,
+      firstName: order.first_name,
+      orderCode: order.code,
+      statusCode,
+      statusName: status.name,
+      managerComment: order.manager_comment,
+    }).catch(console.error)
 
     return NextResponse.json({ ok: true })
   }

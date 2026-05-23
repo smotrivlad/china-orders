@@ -23,6 +23,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   notifyClientStatusChange({
     clientChatId: data.client_chat_id,
+    contact: data.contact,
     firstName: data.first_name,
     orderCode: data.code,
     statusCode: data.statuses.code,
