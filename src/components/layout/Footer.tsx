@@ -31,9 +31,6 @@ export default function Footer() {
           <div>
             <p className="text-xs font-semibold tracking-widest uppercase text-milk/30 mb-4">Контакты</p>
             <ul className="space-y-3">
-              <li className="text-sm text-milk/50">
-                Telegram: <a href="https://t.me/chinaorders_notify_bot" className="text-milk/70 hover:text-milk transition-colors">@chinaorders_notify_bot</a>
-              </li>
               <li className="text-sm text-milk/50">Режим работы: 9:00 – 21:00 МСК</li>
             </ul>
           </div>
