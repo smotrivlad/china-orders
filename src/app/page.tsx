@@ -222,10 +222,12 @@ export default function HomePage() {
               style={{ textDecoration: 'none' }}
             >
               <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl"
+                className="w-14 h-14 rounded-2xl flex items-center justify-center"
                 style={{ background: 'rgba(39,174,239,0.12)', border: '1px solid rgba(39,174,239,0.2)' }}
               >
-                ✈️
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="#2AABEE" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248l-2.012 9.488c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L8.32 14.617l-2.96-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.496.969z"/>
+                </svg>
               </div>
               <div className="text-center">
                 <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'rgba(245,240,232,0.4)' }}>Telegram</p>
