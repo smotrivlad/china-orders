@@ -150,7 +150,7 @@ export default function HomePage() {
                   alt="EASTWIND LOGISTIC"
                   width={200}
                   height={200}
-                  style={{ objectFit: 'contain', background: 'transparent', position: 'relative', zIndex: 10 }}
+                  style={{ objectFit: 'contain', mixBlendMode: 'screen', display: 'block', position: 'relative', zIndex: 10 }}
                 />
               </div>
             </div>
