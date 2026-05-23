@@ -96,9 +96,10 @@ export async function POST(req: NextRequest) {
 
   console.log(`[orders] Order created: ${order.code}`)
 
-  // ── Telegram уведомление (с таймаутом — не блокирует ответ) ───────────────
-  // Если Telegram API тормозит или недоступен, заявка всё равно создана.
-  withTimeout(notifyNewOrder(order), 7_000)
+  // ── Telegram уведомление (await с таймаутом 5s) ──────────────────────────
+  // На Vercel Serverless функция замораживается после return — fire-and-forget
+  // не работает. Awaiting гарантирует доставку; maxDuration=30 даёт запас.
+  await withTimeout(notifyNewOrder(order), 5_000)
     .catch(e => console.error('[orders] Telegram notification error:', e))
 
   return NextResponse.json({ code: order.code })
