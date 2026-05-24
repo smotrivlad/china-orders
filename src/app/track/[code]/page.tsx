@@ -176,13 +176,10 @@ export default async function TrackCodePage({ params }: { params: Promise<{ code
                       <div className="space-y-2">
                         <Row label="Название" value={item.product_name} />
                         {item.description && <Row label="Описание" value={item.description} />}
-                        {item.link && (
+                        {item.link && item.link !== '-' && (
                           <Row label="Ссылка" value={
                             <a href={item.link} target="_blank" rel="noopener"
-                              className="break-all transition-colors"
-                              style={{ color: '#8B1A2F' }}
-                              onMouseEnter={e => (e.currentTarget.style.color = '#A52238')}
-                              onMouseLeave={e => (e.currentTarget.style.color = '#8B1A2F')}>
+                              className="break-all text-burgundy hover:text-burgundy-light transition-colors">
                               {item.link}
                             </a>
                           } />
