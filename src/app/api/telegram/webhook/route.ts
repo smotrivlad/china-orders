@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { adminClient } from '@/lib/supabase/admin'
 import { tg, buildContactButton } from '@/lib/utils/telegram'
 import { notifyClientStatusChange } from '@/lib/utils/notifyClient'
+import { parseStartParam, verifySubscribeToken } from '@/lib/utils/subscribeToken'
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-telegram-bot-api-secret-token')
@@ -12,44 +13,104 @@ export async function POST(req: NextRequest) {
   const token = process.env.TELEGRAM_BOT_TOKEN!
   const update = await req.json()
 
-  // Клиент пишет боту — регистрируем chat_id по коду заявки
+  // ── Входящее сообщение от клиента ────────────────────────────────────────
   if (update.message) {
     const { chat, text } = update.message
-    const chatId = chat.id
-    const raw = (text ?? '').trim()
+    const chatId     = chat.id
+    const username   = (chat.username ?? '').toLowerCase()   // @username без '@'
+    const raw        = (text ?? '').trim()
 
-    // Извлекаем код из "/start CH-1000" или просто "CH-1000"
-    const match = raw.match(/CH-\d+/i)
-    if (match) {
-      const code = match[0].toUpperCase()
-      const { data: order, error } = await adminClient
+    // ── Обработка /start ───────────────────────────────────────────────────
+    if (raw.startsWith('/start')) {
+      const param = raw.slice(6).trim()  // всё после '/start '
+
+      if (!param) {
+        // /start без параметра — приветствие
+        await tg(token, 'sendMessage', {
+          chat_id: chatId,
+          text: 'Привет! 👋\n\nЭтот бот отправляет уведомления об изменении статуса вашей заявки.\n\nДля подписки перейдите на страницу вашей заявки и нажмите кнопку <b>«Подписаться на уведомления»</b>.',
+          parse_mode: 'HTML',
+        })
+        return NextResponse.json({ ok: true })
+      }
+
+      // Ожидаем формат CH-XXXX_<16hexchars>
+      const parsed = parseStartParam(param)
+
+      if (!parsed || !verifySubscribeToken(parsed.orderCode, parsed.token)) {
+        // Ссылка недействительна или устарела
+        await tg(token, 'sendMessage', {
+          chat_id: chatId,
+          text: '❌ Ссылка недействительна.\n\nПерейдите на страницу вашей заявки и нажмите кнопку <b>«Подписаться на уведомления»</b>.',
+          parse_mode: 'HTML',
+        })
+        return NextResponse.json({ ok: true })
+      }
+
+      // Токен верный — ищем заявку
+      const { data: order, error: orderErr } = await adminClient
         .from('orders')
-        .update({ client_chat_id: chatId })
-        .eq('code', code)
-        .select('first_name, code')
+        .select('id, first_name, code, contact, client_chat_id')
+        .eq('code', parsed.orderCode)
         .single()
 
-      if (!error && order) {
+      if (orderErr || !order) {
         await tg(token, 'sendMessage', {
           chat_id: chatId,
-          text: `Привет, ${order.first_name}! 🎉\n\nВы подписались на уведомления по заявке <b>${order.code}</b>.\n\nКак только статус изменится — я сразу напишу вам.`,
+          text: `❌ Заявка <b>${parsed.orderCode}</b> не найдена.`,
           parse_mode: 'HTML',
         })
-      } else {
-        await tg(token, 'sendMessage', {
-          chat_id: chatId,
-          text: `Заявка <b>${code}</b> не найдена. Проверьте номер и попробуйте ещё раз.`,
-          parse_mode: 'HTML',
-        })
+        return NextResponse.json({ ok: true })
       }
-    } else {
+
+      // ── Проверка владельца ─────────────────────────────────────────────
+      const contact = (order.contact ?? '').trim()
+
+      if (contact.startsWith('@')) {
+        // Контакт — Telegram username: проверяем совпадение
+        const orderUsername = contact.slice(1).toLowerCase()
+        if (!username || username !== orderUsername) {
+          await tg(token, 'sendMessage', {
+            chat_id: chatId,
+            text: '🔒 Эта заявка принадлежит другому клиенту.\n\nЕсли это ваша заявка — проверьте, что вы вошли в тот Telegram-аккаунт, с которого оформляли заказ.',
+          })
+          return NextResponse.json({ ok: true })
+        }
+      }
+      // Для телефонных контактов: HMAC-токен уже проверен выше —
+      // этого достаточно, т.к. ссылку видит только владелец заявки.
+
+      // Уже подписан?
+      if (order.client_chat_id && Number(order.client_chat_id) === chatId) {
+        await tg(token, 'sendMessage', {
+          chat_id: chatId,
+          text: `✅ Вы уже подписаны на уведомления по заявке <b>${order.code}</b>.`,
+          parse_mode: 'HTML',
+        })
+        return NextResponse.json({ ok: true })
+      }
+
+      // Подписываем
+      await adminClient
+        .from('orders')
+        .update({ client_chat_id: chatId })
+        .eq('id', order.id)
+
       await tg(token, 'sendMessage', {
         chat_id: chatId,
-        text: 'Пришлите номер вашей заявки в формате <b>CH-1000</b>, чтобы подписаться на уведомления.',
+        text: `Привет, ${order.first_name}! 🎉\n\nВы подписались на уведомления по заявке <b>${order.code}</b>.\nКак только статус изменится — я сразу напишу вам.\n\n🔗 Отследить: https://china-orders.vercel.app/track/${order.code}`,
         parse_mode: 'HTML',
       })
+      return NextResponse.json({ ok: true })
     }
 
+    // ── Любое другое сообщение (в т.ч. ввод кода вручную) ────────────────
+    // Намеренно НЕ обрабатываем прямой ввод кода — только через защищённую ссылку
+    await tg(token, 'sendMessage', {
+      chat_id: chatId,
+      text: 'Для подписки на уведомления перейдите на страницу вашей заявки и нажмите кнопку <b>«Подписаться на уведомления»</b>.',
+      parse_mode: 'HTML',
+    })
     return NextResponse.json({ ok: true })
   }
 

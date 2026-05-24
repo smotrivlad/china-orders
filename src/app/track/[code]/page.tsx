@@ -3,7 +3,10 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import TrackTimeline from './TrackTimeline'
 import { adminClient } from '@/lib/supabase/admin'
+import { buildStartParam } from '@/lib/utils/subscribeToken'
 import type { Order, OrderItem, Status } from '@/types'
+
+const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME ?? 'chinaorders_notify_bot'
 
 export default async function TrackCodePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
@@ -89,6 +92,45 @@ export default async function TrackCodePage({ params }: { params: Promise<{ code
 
             {/* Details */}
             <div className="lg:col-span-3 space-y-4">
+              {/* Subscription status */}
+              {o.client_chat_id ? (
+                <div className="glass rounded-3xl px-6 py-4 flex items-center gap-3"
+                  style={{ borderColor: 'rgba(34,158,217,0.2)' }}>
+                  <span className="text-lg">✅</span>
+                  <p className="text-sm" style={{ color: 'rgba(245,240,232,0.6)' }}>
+                    Уведомления Telegram подключены
+                  </p>
+                </div>
+              ) : (
+                <div className="glass rounded-3xl p-5">
+                  <div className="flex items-center gap-4">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ background: 'rgba(34,158,217,0.12)' }}>
+                      <svg viewBox="0 0 24 24" fill="#229ED9" className="w-4 h-4">
+                        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.248-1.97 9.289c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12L7.048 13.84l-2.948-.924c-.64-.203-.653-.64.136-.953l11.57-4.461c.532-.194 1.00.13.756.746z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium" style={{ color: '#F5F0E8' }}>
+                        Уведомления в Telegram
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: 'rgba(245,240,232,0.4)' }}>
+                        Подпишитесь — узнавайте о статусе первыми
+                      </p>
+                    </div>
+                    <a
+                      href={`https://t.me/${BOT_USERNAME}?start=${buildStartParam(o.code)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 rounded-xl px-4 py-2 text-xs font-semibold text-white whitespace-nowrap"
+                      style={{ background: '#229ED9' }}
+                    >
+                      Подписаться
+                    </a>
+                  </div>
+                </div>
+              )}
+
               {o.manager_comment && (
                 <div className="glass rounded-3xl p-6"
                   style={{ borderColor: 'rgba(139,26,47,0.25)' }}>

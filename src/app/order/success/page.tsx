@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
+import { buildStartParam } from '@/lib/utils/subscribeToken'
 
-const BOT_USERNAME = 'chinaorders_notify_bot'
+const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME ?? 'chinaorders_notify_bot'
 
 export default async function SuccessPage({
   searchParams,
@@ -67,7 +68,7 @@ export default async function SuccessPage({
                     Подпишитесь на бота — как только статус изменится, вы сразу узнаете.
                   </p>
                   <a
-                    href={`https://t.me/${BOT_USERNAME}?start=${code}`}
+                    href={`https://t.me/${BOT_USERNAME}?start=${buildStartParam(code)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-3 inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition-colors"
