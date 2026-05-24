@@ -1,20 +1,24 @@
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import TrackTimeline from './TrackTimeline'
+import TrackVerifyCard from './TrackVerifyCard'
 import { adminClient } from '@/lib/supabase/admin'
 import { buildStartParam } from '@/lib/utils/subscribeToken'
+import { makeTrackAccessToken, contactType } from '@/lib/utils/trackAccess'
 import type { Order, OrderItem, Status } from '@/types'
 
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME ?? 'chinaorders_notify_bot'
 
 export default async function TrackCodePage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params
+  const upperCode = code.toUpperCase()
 
   const { data: order, error } = await adminClient
     .from('orders')
     .select('*, statuses(*)')
-    .eq('code', code.toUpperCase())
+    .eq('code', upperCode)
     .single()
 
   if (error || !order) {
@@ -42,7 +46,21 @@ export default async function TrackCodePage({ params }: { params: Promise<{ code
 
   const o = order as Order & { statuses: Status }
 
-  // Товары: items из БД или legacy-поля
+  // ── Проверка доступа: cookie с HMAC-токеном ────────────────────────────────
+  const cookieStore = await cookies()
+  const cookieToken = cookieStore.get(`track_${upperCode}`)?.value
+  const hasAccess   = cookieToken === makeTrackAccessToken(upperCode)
+
+  if (!hasAccess) {
+    return (
+      <>
+        <Navbar />
+        <TrackVerifyCard code={upperCode} contactType={contactType(o.contact)} />
+      </>
+    )
+  }
+
+  // ── Товары: items из БД или legacy-поля ────────────────────────────────────
   const items: OrderItem[] =
     o.items && o.items.length > 0
       ? o.items

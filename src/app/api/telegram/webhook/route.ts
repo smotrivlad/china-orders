@@ -81,7 +81,8 @@ export async function POST(req: NextRequest) {
       // этого достаточно, т.к. ссылку видит только владелец заявки.
 
       // Уже подписан?
-      if (order.client_chat_id && Number(order.client_chat_id) === chatId) {
+      // Supabase возвращает bigint как строку — сравниваем через String()
+      if (order.client_chat_id && String(order.client_chat_id) === String(chatId)) {
         await tg(token, 'sendMessage', {
           chat_id: chatId,
           text: `✅ Вы уже подписаны на уведомления по заявке <b>${order.code}</b>.`,
@@ -90,11 +91,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
-      // Подписываем
-      await adminClient
+      // Подписываем — сохраняем chat_id в базе
+      const { error: saveError } = await adminClient
         .from('orders')
         .update({ client_chat_id: chatId })
         .eq('id', order.id)
+
+      if (saveError) {
+        console.error('[webhook] Failed to save client_chat_id for order', order.code, ':', saveError.message)
+        await tg(token, 'sendMessage', {
+          chat_id: chatId,
+          text: '❌ Не удалось сохранить подписку. Пожалуйста, попробуйте чуть позже.',
+        })
+        return NextResponse.json({ ok: true })
+      }
+
+      console.log(`[webhook] Subscribed chat_id=${chatId} to order ${order.code}`)
 
       await tg(token, 'sendMessage', {
         chat_id: chatId,
@@ -104,13 +116,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // ── Любое другое сообщение (в т.ч. ввод кода вручную) ────────────────
-    // Намеренно НЕ обрабатываем прямой ввод кода — только через защищённую ссылку
-    await tg(token, 'sendMessage', {
-      chat_id: chatId,
-      text: 'Для подписки на уведомления перейдите на страницу вашей заявки и нажмите кнопку <b>«Подписаться на уведомления»</b>.',
-      parse_mode: 'HTML',
-    })
+    // ── Любое другое сообщение ────────────────────────────────────────────
+    // Проверяем: возможно, пользователь уже подписан — тогда показываем его заявки
+    const { data: subscribedOrders } = await adminClient
+      .from('orders')
+      .select('code, statuses(name)')
+      .eq('client_chat_id', chatId)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (subscribedOrders && subscribedOrders.length > 0) {
+      // statuses может быть объектом или массивом в зависимости от схемы Supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const lines = subscribedOrders.map((o: any) => {
+        const statusName = Array.isArray(o.statuses) ? o.statuses[0]?.name : o.statuses?.name
+        return `• <b>${o.code}</b> — ${statusName ?? '—'}`
+      })
+      await tg(token, 'sendMessage', {
+        chat_id: chatId,
+        text: `Ваши заявки:\n\n${lines.join('\n')}\n\nДля просмотра деталей откройте: https://china-orders.vercel.app/track`,
+        parse_mode: 'HTML',
+      })
+    } else {
+      await tg(token, 'sendMessage', {
+        chat_id: chatId,
+        text: 'Для подписки на уведомления перейдите на страницу вашей заявки и нажмите кнопку <b>«Подписаться на уведомления»</b>.',
+        parse_mode: 'HTML',
+      })
+    }
     return NextResponse.json({ ok: true })
   }
 
