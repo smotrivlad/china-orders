@@ -2,6 +2,7 @@ import { adminClient } from '@/lib/supabase/admin'
 import { notFound } from 'next/navigation'
 import type { Order, OrderItem, Status } from '@/types'
 import OrderEditor from './OrderEditor'
+import PinActions from '@/components/admin/PinActions'
 import { generateOrderPin } from '@/lib/utils/orderPin'
 
 export const dynamic = 'force-dynamic'
@@ -17,7 +18,12 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
   if (!order) notFound()
 
   const o = order as Order & { statuses: Status }
-  const pin = generateOrderPin(o.code)
+
+  // Resolve effective PIN: DB-stored value takes priority, fallback to HMAC
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dbPin: string | null = (o as any).pin ?? null
+  const effectivePin = dbPin?.trim().length === 6 ? dbPin.trim() : generateOrderPin(o.code)
+  const isHmacFallback = !dbPin || dbPin.trim().length !== 6
 
   // Товары: если есть поле items — используем его, иначе собираем из legacy-полей
   const items: OrderItem[] =
@@ -35,14 +41,23 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
       {/* Инфо о заявке */}
       <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm space-y-3">
         <h2 className="font-semibold text-gray-900 mb-4">Данные заявки</h2>
-        <Row label="Клиент"   value={`${o.first_name} ${o.last_name}`} />
-        <Row label="Контакт"  value={o.contact} />
+        <Row label="Клиент"    value={`${o.first_name} ${o.last_name}`} />
+        <Row label="Контакт"   value={o.contact} />
         <Row label="Срочность" value={o.urgency === 'urgent' ? '⚡ Срочно' : '🕐 Обычная'} />
-        <Row label="Тип"      value={o.order_type === 'group' ? '👥 Совместный' : '👤 Личный'} />
-        <Row label="Дата"     value={new Date(o.created_at).toLocaleString('ru-RU')} />
-        <Row label="PIN"      value={
-          <span className="font-mono font-semibold tracking-widest text-red-700">{pin}</span>
-        } />
+        <Row label="Тип"       value={o.order_type === 'group' ? '👥 Совместный' : '👤 Личный'} />
+        <Row label="Дата"      value={new Date(o.created_at).toLocaleString('ru-RU')} />
+
+        {/* PIN row — interactive client component */}
+        <div className="flex gap-4">
+          <span className="w-28 shrink-0 text-sm text-gray-500 pt-0.5">PIN</span>
+          <div className="flex-1">
+            <PinActions
+              orderId={o.id}
+              initialPin={effectivePin}
+              isHmacFallback={isHmacFallback}
+            />
+          </div>
+        </div>
       </div>
 
       {/* Товары */}

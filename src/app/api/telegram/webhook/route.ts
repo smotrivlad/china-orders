@@ -3,7 +3,19 @@ import { adminClient } from '@/lib/supabase/admin'
 import { tg, buildContactButton } from '@/lib/utils/telegram'
 import { notifyClientStatusChange } from '@/lib/utils/notifyClient'
 import { parseStartParam, verifySubscribeToken } from '@/lib/utils/subscribeToken'
-import { verifyOrderPin } from '@/lib/utils/orderPin'
+import { checkPin } from '@/lib/utils/orderPin'
+
+/** Fetches the DB-stored pin; returns null if column missing or row not found */
+async function fetchDbPin(orderCode: string): Promise<string | null> {
+  const { data, error } = await adminClient
+    .from('orders')
+    .select('pin')
+    .eq('code', orderCode)
+    .single()
+  if (error) return null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any)?.pin ?? null
+}
 
 const MAX_BOT_ATTEMPTS = 5
 const BOT_BLOCK_WINDOW = 60 * 60 * 1000 // 1 hour
@@ -82,8 +94,9 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ ok: true })
         }
 
-        // Verify PIN
-        if (!verifyOrderPin(pendingCode, raw)) {
+        // Verify PIN — check DB-stored pin first, fall back to HMAC
+        const dbPin = await fetchDbPin(pendingCode)
+        if (!checkPin(pendingCode, raw, dbPin)) {
           await recordBotFailure(chatId)
           const remaining = MAX_BOT_ATTEMPTS - failures - 1
           await tg(token, 'sendMessage', {

@@ -3,10 +3,10 @@
 import { cookies, headers } from 'next/headers'
 import { adminClient } from '@/lib/supabase/admin'
 import { makeTrackAccessToken } from '@/lib/utils/trackAccess'
-import { verifyOrderPin } from '@/lib/utils/orderPin'
+import { checkPin } from '@/lib/utils/orderPin'
 
-const MAX_ATTEMPTS  = 5
-const BLOCK_WINDOW  = 60 * 60 * 1000 // 1 hour in ms
+const MAX_ATTEMPTS = 5
+const BLOCK_WINDOW = 60 * 60 * 1000 // 1 hour in ms
 
 /** Extract client IP from Vercel / standard reverse-proxy headers */
 async function getIdentifier(): Promise<string> {
@@ -39,6 +39,21 @@ async function clearFailures(identifier: string): Promise<void> {
     .gte('created_at', since)
 }
 
+/**
+ * Tries to fetch the DB-stored pin for an order.
+ * Falls back to null gracefully if the column doesn't exist yet.
+ */
+async function fetchDbPin(upperCode: string): Promise<string | null> {
+  const { data, error } = await adminClient
+    .from('orders')
+    .select('pin')
+    .eq('code', upperCode)
+    .single()
+  if (error) return null  // column missing (42703) or other error
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any)?.pin ?? null
+}
+
 export async function verifyTrackPin(
   code: string,
   pin: string,
@@ -53,14 +68,14 @@ export async function verifyTrackPin(
       return {
         ok: false,
         blocked: true,
-        error: `Слишком много неверных попыток. Попробуйте через 1 час.`,
+        error: 'Слишком много неверных попыток. Попробуйте через 1 час.',
       }
     }
   } catch {
     // pin_attempts table may not exist yet — skip rate limiting gracefully
   }
 
-  // ── Verify order exists ──────────────────────────────────────────────────
+  // ── Fetch order + DB pin ──────────────────────────────────────────────────
   const { data: order } = await adminClient
     .from('orders')
     .select('code')
@@ -68,13 +83,13 @@ export async function verifyTrackPin(
     .single()
 
   if (!order) {
-    // Don't reveal whether the code exists to avoid code enumeration
     try { await recordFailure(identifier) } catch { /* ignore */ }
     return { ok: false, error: 'Неверный код или PIN.' }
   }
 
-  // ── Verify PIN ────────────────────────────────────────────────────────────
-  const correct = verifyOrderPin(upperCode, pin)
+  // Check DB-stored pin (admin may have regenerated) — fall back to HMAC
+  const dbPin = await fetchDbPin(upperCode)
+  const correct = checkPin(upperCode, pin, dbPin)
 
   if (!correct) {
     try { await recordFailure(identifier) } catch { /* ignore */ }
@@ -92,7 +107,6 @@ export async function verifyTrackPin(
     path: '/',
   })
 
-  // Clear failure count on successful login
   try { await clearFailures(identifier) } catch { /* ignore */ }
 
   return { ok: true }
