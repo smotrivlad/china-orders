@@ -2,6 +2,7 @@ import { adminClient } from '@/lib/supabase/admin'
 import { notFound } from 'next/navigation'
 import type { Order, OrderItem, Status } from '@/types'
 import OrderEditor from './OrderEditor'
+import { generateOrderPin } from '@/lib/utils/orderPin'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,7 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
   if (!order) notFound()
 
   const o = order as Order & { statuses: Status }
+  const pin = generateOrderPin(o.code)
 
   // Товары: если есть поле items — используем его, иначе собираем из legacy-полей
   const items: OrderItem[] =
@@ -38,6 +40,9 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
         <Row label="Срочность" value={o.urgency === 'urgent' ? '⚡ Срочно' : '🕐 Обычная'} />
         <Row label="Тип"      value={o.order_type === 'group' ? '👥 Совместный' : '👤 Личный'} />
         <Row label="Дата"     value={new Date(o.created_at).toLocaleString('ru-RU')} />
+        <Row label="PIN"      value={
+          <span className="font-mono font-semibold tracking-widest text-red-700">{pin}</span>
+        } />
       </div>
 
       {/* Товары */}

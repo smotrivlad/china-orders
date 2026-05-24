@@ -6,7 +6,7 @@ import TrackTimeline from './TrackTimeline'
 import TrackVerifyCard from './TrackVerifyCard'
 import { adminClient } from '@/lib/supabase/admin'
 import { buildStartParam } from '@/lib/utils/subscribeToken'
-import { makeTrackAccessToken, contactType } from '@/lib/utils/trackAccess'
+import { makeTrackAccessToken } from '@/lib/utils/trackAccess'
 import type { Order, OrderItem, Status } from '@/types'
 
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME ?? 'chinaorders_notify_bot'
@@ -55,7 +55,7 @@ export default async function TrackCodePage({ params }: { params: Promise<{ code
     return (
       <>
         <Navbar />
-        <TrackVerifyCard code={upperCode} contactType={contactType(o.contact)} />
+        <TrackVerifyCard code={upperCode} />
       </>
     )
   }

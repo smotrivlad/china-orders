@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import { buildStartParam } from '@/lib/utils/subscribeToken'
+import { generateOrderPin } from '@/lib/utils/orderPin'
 
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME ?? 'chinaorders_notify_bot'
 
@@ -10,6 +11,7 @@ export default async function SuccessPage({
   searchParams: Promise<{ code?: string }>
 }) {
   const { code } = await searchParams
+  const pin = code ? generateOrderPin(code) : null
 
   return (
     <>
@@ -20,7 +22,7 @@ export default async function SuccessPage({
           style={{ background: 'rgba(139,26,47,0.08)' }} />
 
         <div className="relative z-10 w-full max-w-lg mx-auto px-4 text-center">
-          {/* Icon */}
+          {/* Success icon */}
           <div className="mb-8 inline-flex items-center justify-center w-20 h-20 rounded-full"
             style={{ background: 'rgba(139,26,47,0.15)', border: '1px solid rgba(139,26,47,0.3)' }}>
             <svg viewBox="0 0 24 24" fill="none" className="w-9 h-9"
@@ -33,24 +35,56 @@ export default async function SuccessPage({
             Заявка принята!
           </h1>
 
-          {code && (
-            <div className="mt-6 glass rounded-2xl px-8 py-5 inline-block">
-              <p className="text-xs uppercase tracking-widest mb-2" style={{ color: 'rgba(245,240,232,0.4)' }}>
-                Номер заявки
+          {/* Code + PIN — primary CTA block */}
+          {code && pin && (
+            <div className="mt-6 glass rounded-2xl px-8 py-6"
+              style={{ borderColor: 'rgba(139,26,47,0.3)' }}>
+              <p className="text-xs uppercase tracking-widest mb-5"
+                style={{ color: 'rgba(245,240,232,0.4)' }}>
+                📋 Сохраните оба кода для отслеживания
               </p>
-              <p className="font-mono font-bold text-3xl" style={{ color: '#F5F0E8' }}>
-                {code}
+
+              <div className="flex items-center justify-center gap-8 flex-wrap">
+                {/* Order code */}
+                <div className="text-center">
+                  <p className="text-[10px] uppercase tracking-widest mb-1.5"
+                    style={{ color: 'rgba(245,240,232,0.35)' }}>
+                    Код заявки
+                  </p>
+                  <p className="font-mono font-bold text-3xl" style={{ color: '#F5F0E8' }}>
+                    {code}
+                  </p>
+                </div>
+
+                {/* Divider */}
+                <div className="w-px h-12 hidden sm:block"
+                  style={{ background: 'rgba(245,240,232,0.08)' }} />
+
+                {/* PIN */}
+                <div className="text-center">
+                  <p className="text-[10px] uppercase tracking-widest mb-1.5"
+                    style={{ color: 'rgba(245,240,232,0.35)' }}>
+                    PIN
+                  </p>
+                  <p className="font-mono font-bold text-3xl tracking-[0.25em]"
+                    style={{ color: '#8B1A2F' }}>
+                    {pin}
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-5 text-xs" style={{ color: 'rgba(245,240,232,0.3)' }}>
+                Оба кода нужны для просмотра заявки на сайте
               </p>
             </div>
           )}
 
           <p className="mt-6 text-base leading-relaxed max-w-sm mx-auto"
             style={{ color: 'rgba(245,240,232,0.5)' }}>
-            Сохраните номер — он нужен для отслеживания.
             Свяжемся с вами в течение 30 минут.
           </p>
 
-          {/* Telegram */}
+          {/* Telegram subscription */}
           {code && (
             <div className="mt-8 glass rounded-2xl p-6 text-left">
               <div className="flex items-start gap-4">
@@ -83,11 +117,9 @@ export default async function SuccessPage({
 
           {/* Actions */}
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-            {code && (
-              <Link href={`/track/${code}`} className="btn-primary">
-                Отследить заявку →
-              </Link>
-            )}
+            <Link href="/track" className="btn-primary">
+              Отследить заявку →
+            </Link>
             <Link href="/order" className="btn-outline">
               Ещё одна заявка
             </Link>

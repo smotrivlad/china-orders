@@ -3,6 +3,52 @@ import { adminClient } from '@/lib/supabase/admin'
 import { tg, buildContactButton } from '@/lib/utils/telegram'
 import { notifyClientStatusChange } from '@/lib/utils/notifyClient'
 import { parseStartParam, verifySubscribeToken } from '@/lib/utils/subscribeToken'
+import { verifyOrderPin } from '@/lib/utils/orderPin'
+
+const MAX_BOT_ATTEMPTS = 5
+const BOT_BLOCK_WINDOW = 60 * 60 * 1000 // 1 hour
+
+// ── PIN rate limiting helpers (bot uses 'tg:{chatId}' as identifier) ────────
+
+async function botAttemptCount(chatId: number): Promise<number> {
+  try {
+    const since = new Date(Date.now() - BOT_BLOCK_WINDOW).toISOString()
+    const { count } = await adminClient
+      .from('pin_attempts')
+      .select('*', { count: 'exact', head: true })
+      .eq('identifier', `tg:${chatId}`)
+      .gte('created_at', since)
+    return count ?? 0
+  } catch { return 0 }
+}
+
+async function recordBotFailure(chatId: number): Promise<void> {
+  try {
+    await adminClient.from('pin_attempts').insert({ identifier: `tg:${chatId}` })
+  } catch { /* ignore if table missing */ }
+}
+
+async function clearBotFailures(chatId: number): Promise<void> {
+  try {
+    const since = new Date(Date.now() - BOT_BLOCK_WINDOW).toISOString()
+    await adminClient.from('pin_attempts').delete()
+      .eq('identifier', `tg:${chatId}`)
+      .gte('created_at', since)
+  } catch { /* ignore */ }
+}
+
+// Marker embedded in the PIN-request message so we can parse the order code back
+// from reply_to_message.text without any session storage.
+const PIN_MARKER = '🔑 PIN · '    // e.g. "🔑 PIN · CH-1234"
+function buildPinRequestText(orderCode: string) {
+  return `${PIN_MARKER}${orderCode}\n\nВведите 6-значный PIN вашей заявки:`
+}
+function parsePinRequestCode(text: string): string | null {
+  const m = text.match(/🔑 PIN · (CH-\d+)/)
+  return m ? m[1].toUpperCase() : null
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   const secret = req.headers.get('x-telegram-bot-api-secret-token')
@@ -10,22 +56,103 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 401 })
   }
 
-  const token = process.env.TELEGRAM_BOT_TOKEN!
+  const token  = process.env.TELEGRAM_BOT_TOKEN!
   const update = await req.json()
 
-  // ── Входящее сообщение от клиента ────────────────────────────────────────
+  // ── Incoming message from client ────────────────────────────────────────
   if (update.message) {
-    const { chat, text } = update.message
-    const chatId     = chat.id
-    const username   = (chat.username ?? '').toLowerCase()   // @username без '@'
-    const raw        = (text ?? '').trim()
+    const { chat, text, reply_to_message } = update.message
+    const chatId   = chat.id  as number
+    const username = (chat.username ?? '').toLowerCase()
+    const raw      = (text ?? '').trim()
 
-    // ── Обработка /start ───────────────────────────────────────────────────
+    // ── Handle PIN reply (user replied to the bot's PIN request message) ──
+    if (reply_to_message && !raw.startsWith('/')) {
+      const replyText = reply_to_message.text ?? ''
+      const pendingCode = parsePinRequestCode(replyText)
+
+      if (pendingCode) {
+        // Rate limit check
+        const failures = await botAttemptCount(chatId)
+        if (failures >= MAX_BOT_ATTEMPTS) {
+          await tg(token, 'sendMessage', {
+            chat_id: chatId,
+            text: '🚫 Слишком много неверных попыток. Попробуйте через 1 час.',
+          })
+          return NextResponse.json({ ok: true })
+        }
+
+        // Verify PIN
+        if (!verifyOrderPin(pendingCode, raw)) {
+          await recordBotFailure(chatId)
+          const remaining = MAX_BOT_ATTEMPTS - failures - 1
+          await tg(token, 'sendMessage', {
+            chat_id: chatId,
+            text: `❌ Неверный PIN${remaining > 0 ? ` (осталось ${remaining} попыток)` : '. Лимит исчерпан — попробуйте через час'}.`,
+            reply_markup: remaining > 0 ? { force_reply: false } : undefined,
+          })
+          return NextResponse.json({ ok: true })
+        }
+
+        // Correct PIN — find order and subscribe
+        const { data: order, error: orderErr } = await adminClient
+          .from('orders')
+          .select('id, first_name, code, client_chat_id')
+          .eq('code', pendingCode)
+          .single()
+
+        if (orderErr || !order) {
+          await tg(token, 'sendMessage', {
+            chat_id: chatId,
+            text: `❌ Заявка <b>${pendingCode}</b> не найдена.`,
+            parse_mode: 'HTML',
+          })
+          return NextResponse.json({ ok: true })
+        }
+
+        await clearBotFailures(chatId)
+
+        // Already subscribed?
+        if (order.client_chat_id && String(order.client_chat_id) === String(chatId)) {
+          await tg(token, 'sendMessage', {
+            chat_id: chatId,
+            text: `✅ Вы уже подписаны на уведомления по заявке <b>${order.code}</b>.`,
+            parse_mode: 'HTML',
+          })
+          return NextResponse.json({ ok: true })
+        }
+
+        // Subscribe
+        const { error: saveError } = await adminClient
+          .from('orders')
+          .update({ client_chat_id: chatId })
+          .eq('id', order.id)
+
+        if (saveError) {
+          console.error('[webhook] Failed to save client_chat_id for order', order.code, ':', saveError.message)
+          await tg(token, 'sendMessage', {
+            chat_id: chatId,
+            text: '❌ Не удалось сохранить подписку. Пожалуйста, попробуйте чуть позже.',
+          })
+          return NextResponse.json({ ok: true })
+        }
+
+        console.log(`[webhook] Subscribed chat_id=${chatId} to order ${order.code} (PIN verified)`)
+
+        await tg(token, 'sendMessage', {
+          chat_id: chatId,
+          text: `Привет, ${order.first_name}! 🎉\n\nВы подписались на уведомления по заявке <b>${order.code}</b>.\nКак только статус изменится — я сразу напишу вам.\n\n🔗 Отследить: https://china-orders.vercel.app/track`,
+          parse_mode: 'HTML',
+        })
+        return NextResponse.json({ ok: true })
+      }
+    }
+
+    // ── Handle /start ──────────────────────────────────────────────────────
     if (raw.startsWith('/start')) {
-      const param = raw.slice(6).trim()  // всё после '/start '
+      const param = raw.slice(6).trim()
 
       if (!param) {
-        // /start без параметра — приветствие
         await tg(token, 'sendMessage', {
           chat_id: chatId,
           text: 'Привет! 👋\n\nЭтот бот отправляет уведомления об изменении статуса вашей заявки.\n\nДля подписки перейдите на страницу вашей заявки и нажмите кнопку <b>«Подписаться на уведомления»</b>.',
@@ -34,11 +161,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
-      // Ожидаем формат CH-XXXX_<16hexchars>
+      // Expected format: CH-XXXX_<16hexchars>
       const parsed = parseStartParam(param)
-
       if (!parsed || !verifySubscribeToken(parsed.orderCode, parsed.token)) {
-        // Ссылка недействительна или устарела
         await tg(token, 'sendMessage', {
           chat_id: chatId,
           text: '❌ Ссылка недействительна.\n\nПерейдите на страницу вашей заявки и нажмите кнопку <b>«Подписаться на уведомления»</b>.',
@@ -47,7 +172,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
-      // Токен верный — ищем заявку
+      // Find order
       const { data: order, error: orderErr } = await adminClient
         .from('orders')
         .select('id, first_name, code, contact, client_chat_id')
@@ -63,11 +188,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
-      // ── Проверка владельца ─────────────────────────────────────────────
+      // Owner check for @username contacts
       const contact = (order.contact ?? '').trim()
-
       if (contact.startsWith('@')) {
-        // Контакт — Telegram username: проверяем совпадение
         const orderUsername = contact.slice(1).toLowerCase()
         if (!username || username !== orderUsername) {
           await tg(token, 'sendMessage', {
@@ -77,47 +200,27 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ ok: true })
         }
       }
-      // Для телефонных контактов: HMAC-токен уже проверен выше —
-      // этого достаточно, т.к. ссылку видит только владелец заявки.
 
-      // Уже подписан?
-      // Supabase возвращает bigint как строку — сравниваем через String()
-      if (order.client_chat_id && String(order.client_chat_id) === String(chatId)) {
+      // Rate limit check before asking for PIN
+      const failures = await botAttemptCount(chatId)
+      if (failures >= MAX_BOT_ATTEMPTS) {
         await tg(token, 'sendMessage', {
           chat_id: chatId,
-          text: `✅ Вы уже подписаны на уведомления по заявке <b>${order.code}</b>.`,
-          parse_mode: 'HTML',
+          text: '🚫 Слишком много неверных попыток. Попробуйте через 1 час.',
         })
         return NextResponse.json({ ok: true })
       }
 
-      // Подписываем — сохраняем chat_id в базе
-      const { error: saveError } = await adminClient
-        .from('orders')
-        .update({ client_chat_id: chatId })
-        .eq('id', order.id)
-
-      if (saveError) {
-        console.error('[webhook] Failed to save client_chat_id for order', order.code, ':', saveError.message)
-        await tg(token, 'sendMessage', {
-          chat_id: chatId,
-          text: '❌ Не удалось сохранить подписку. Пожалуйста, попробуйте чуть позже.',
-        })
-        return NextResponse.json({ ok: true })
-      }
-
-      console.log(`[webhook] Subscribed chat_id=${chatId} to order ${order.code}`)
-
+      // Ask for PIN (embed order code in message text for stateless parsing)
       await tg(token, 'sendMessage', {
         chat_id: chatId,
-        text: `Привет, ${order.first_name}! 🎉\n\nВы подписались на уведомления по заявке <b>${order.code}</b>.\nКак только статус изменится — я сразу напишу вам.\n\n🔗 Отследить: https://china-orders.vercel.app/track/${order.code}`,
-        parse_mode: 'HTML',
+        text: buildPinRequestText(order.code),
+        reply_markup: { force_reply: true, selective: true },
       })
       return NextResponse.json({ ok: true })
     }
 
-    // ── Любое другое сообщение ────────────────────────────────────────────
-    // Проверяем: возможно, пользователь уже подписан — тогда показываем его заявки
+    // ── Any other message ──────────────────────────────────────────────────
     const { data: subscribedOrders } = await adminClient
       .from('orders')
       .select('code, statuses(name)')
@@ -126,7 +229,6 @@ export async function POST(req: NextRequest) {
       .limit(5)
 
     if (subscribedOrders && subscribedOrders.length > 0) {
-      // statuses может быть объектом или массивом в зависимости от схемы Supabase
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const lines = subscribedOrders.map((o: any) => {
         const statusName = Array.isArray(o.statuses) ? o.statuses[0]?.name : o.statuses?.name
@@ -134,7 +236,7 @@ export async function POST(req: NextRequest) {
       })
       await tg(token, 'sendMessage', {
         chat_id: chatId,
-        text: `Ваши заявки:\n\n${lines.join('\n')}\n\nДля просмотра деталей откройте: https://china-orders.vercel.app/track`,
+        text: `Ваши заявки:\n\n${lines.join('\n')}\n\n🔗 Отследить: https://china-orders.vercel.app/track`,
         parse_mode: 'HTML',
       })
     } else {
@@ -147,16 +249,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  // Callback от кнопок в уведомлении о заявке
+  // ── Callback from inline keyboard buttons ────────────────────────────────
   const cq = update.callback_query
   if (!cq) return NextResponse.json({ ok: true })
 
   const { id: cqId, data, message } = cq
 
-  // Статус: s|orderId|statusCode
+  // Status: s|orderId|statusCode
   if (data?.startsWith('s|')) {
-    const parts = data.split('|')
-    const orderId = parts[1]
+    const parts      = data.split('|')
+    const orderId    = parts[1]
     const statusCode = parts[2]
 
     const { data: status } = await adminClient
@@ -187,7 +289,6 @@ export async function POST(req: NextRequest) {
       text: `✅ Статус → ${status.name}`,
     })
 
-    // Обновляем клавиатуру
     if (message) {
       await tg(token, 'editMessageReplyMarkup', {
         chat_id: message.chat.id,
@@ -201,7 +302,6 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Уведомляем клиента (по chat_id или @username)
     notifyClientStatusChange({
       clientChatId: order.client_chat_id,
       contact: order.contact,
@@ -215,7 +315,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  // Контакт: c|orderId
+  // Contact: c|orderId
   if (data?.startsWith('c|')) {
     const orderId = data.split('|')[1]
     const { data: order } = await adminClient
