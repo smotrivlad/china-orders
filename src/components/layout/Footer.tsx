@@ -17,9 +17,10 @@ export default function Footer() {
             <p className="text-xs font-semibold tracking-widest uppercase text-milk/30 mb-4">Навигация</p>
             <ul className="space-y-3">
               {[
-                ['/', 'Главная'],
-                ['/order', 'Оформить заявку'],
-                ['/track', 'Отследить заявку'],
+                ['/',       'Главная'],
+                ['/about',  'О компании'],
+                ['/order',  'Оформить заявку'],
+                ['/track',  'Отследить заявку'],
               ].map(([href, label]) => (
                 <li key={href}>
                   <Link href={href} className="text-sm text-milk/50 hover:text-milk transition-colors">{label}</Link>

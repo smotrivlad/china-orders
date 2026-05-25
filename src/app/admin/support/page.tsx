@@ -1,5 +1,5 @@
 import { adminClient } from '@/lib/supabase/admin'
-import SupportMessageRow from './SupportMessageRow'
+import SupportSessionCard from './SupportSessionCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,24 +11,25 @@ export default async function AdminSupportPage({
   const { filter } = await searchParams
 
   let query = adminClient
-    .from('support_messages')
+    .from('support_sessions')
     .select('*')
     .order('created_at', { ascending: false })
 
-  if (filter === 'new')       query = query.eq('answered', false)
-  if (filter === 'answered')  query = query.eq('answered', true)
+  if (filter === 'open')   query = query.in('status', ['open', 'pending_close'])
+  if (filter === 'closed') query = query.eq('status', 'closed')
 
-  const { data: messages, error } = await query
+  const { data: sessions, error } = await query
 
-  const { count: newCount } = await adminClient
-    .from('support_messages')
+  // Badge count: open + pending_close
+  const { count: openCount } = await adminClient
+    .from('support_sessions')
     .select('*', { count: 'exact', head: true })
-    .eq('answered', false)
+    .in('status', ['open', 'pending_close'])
 
   const tabs = [
-    { key: undefined,    label: 'Все' },
-    { key: 'new',        label: `Новые${newCount ? ` (${newCount})` : ''}` },
-    { key: 'answered',   label: 'Отвеченные' },
+    { key: undefined,  label: 'Все' },
+    { key: 'open',     label: `Открытые${openCount ? ` (${openCount})` : ''}` },
+    { key: 'closed',   label: 'Закрытые' },
   ]
 
   return (
@@ -36,15 +37,15 @@ export default async function AdminSupportPage({
       <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Поддержка</h1>
-          {newCount ? (
-            <p className="text-sm text-red-600 mt-0.5 font-medium">{newCount} новых сообщений</p>
+          {openCount ? (
+            <p className="text-sm text-red-600 mt-0.5 font-medium">{openCount} активных диалогов</p>
           ) : (
-            <p className="text-sm text-gray-500 mt-0.5">Нет новых сообщений</p>
+            <p className="text-sm text-gray-500 mt-0.5">Нет активных диалогов</p>
           )}
         </div>
       </div>
 
-      {/* Filter tabs */}
+      {/* Tabs */}
       <div className="mb-5 flex gap-2 flex-wrap">
         {tabs.map(tab => {
           const isActive = filter === tab.key || (!filter && !tab.key)
@@ -62,21 +63,22 @@ export default async function AdminSupportPage({
         })}
       </div>
 
+      {/* Error: tables don't exist yet */}
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
-          <p className="text-sm text-red-700 font-medium">Таблица не найдена</p>
+          <p className="text-sm text-red-700 font-medium">Таблицы не найдены</p>
           <p className="text-xs text-red-600 mt-1">
-            Примените миграцию 010_add_support_messages.sql в Supabase Dashboard → SQL Editor
+            Примените миграцию <code>012_redesign_support.sql</code> в Supabase Dashboard → SQL Editor
           </p>
         </div>
-      ) : !messages?.length ? (
+      ) : !sessions?.length ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-12 text-center text-gray-500">
-          Сообщений нет
+          Диалогов нет
         </div>
       ) : (
         <div className="space-y-3">
-          {messages.map(msg => (
-            <SupportMessageRow key={msg.id} message={msg} />
+          {sessions.map(s => (
+            <SupportSessionCard key={s.id} session={s} />
           ))}
         </div>
       )}

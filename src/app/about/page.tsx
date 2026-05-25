@@ -1,10 +1,19 @@
 'use client'
 
-import { useRef } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { motion, useInView, type Variants } from 'framer-motion'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import ReviewsSlider from '@/components/ReviewsSlider'
+
+interface Review {
+  id: string
+  client_name: string
+  text: string
+  photo_url: string | null
+  created_at: string
+}
 
 const EASE = [0.16, 1, 0.3, 1] as [number, number, number, number]
 
@@ -92,6 +101,14 @@ function InViewSection({ children, className = '' }: { children: React.ReactNode
 
 /* ══════════════════════════════════════════════════════════════════════════ */
 export default function AboutPage() {
+  const [reviews, setReviews] = useState<Review[]>([])
+
+  useEffect(() => {
+    fetch('/api/reviews')
+      .then(r => r.json())
+      .then(({ reviews: data }) => setReviews(data ?? []))
+      .catch(() => {})
+  }, [])
   return (
     <>
       <Navbar />
@@ -120,7 +137,7 @@ export default function AboutPage() {
             style={{ fontSize: 'clamp(3rem, 7vw, 6rem)' }}
           >
             <span style={{ color: '#F5F0E8' }}>О&nbsp;</span>
-            <span style={{ color: '#8B1A2F' }}>нас</span>
+            <span style={{ color: '#8B1A2F' }}>компании</span>
           </motion.h1>
 
           <motion.p
@@ -218,9 +235,9 @@ export default function AboutPage() {
 
                 <h2 className="font-display leading-tight"
                   style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', color: '#F5F0E8' }}>
-                  Начал в&nbsp;21&nbsp;год.<br />
-                  <span style={{ color: '#8B1A2F' }}>Без схем.</span> Только желание<br />
-                  разобраться.
+                  В&nbsp;21&nbsp;год. <span style={{ color: '#8B1A2F' }}>Без готовых схем.</span><br />
+                  Только желание разобраться —<br />
+                  и сделать это правильно.
                 </h2>
 
                 <div className="space-y-4">
@@ -311,47 +328,22 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ── MISSION QUOTE ─────────────────────────────────────────────────── */}
-      <section className="py-32 relative overflow-hidden">
-        {/* Background accent */}
-        <div className="absolute inset-0"
-          style={{ background: 'linear-gradient(135deg, rgba(139,26,47,0.09) 0%, transparent 60%)' }} />
-        <div className="absolute top-0 left-0 right-0 h-px"
-          style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(139,26,47,0.4) 50%, transparent 100%)' }} />
-        <div className="absolute bottom-0 left-0 right-0 h-px"
-          style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(139,26,47,0.2) 50%, transparent 100%)' }} />
-
-        <div className="relative z-10 mx-auto max-w-4xl px-4 sm:px-6 text-center">
-          <InViewSection>
-            <motion.div variants={fadeUp} className="space-y-8">
-              {/* Quote marks */}
-              <div className="font-display text-8xl leading-none select-none"
-                style={{ color: 'rgba(139,26,47,0.3)', lineHeight: 0.8 }}>
-                "
-              </div>
-
-              <h2 className="font-display leading-[1.2] tracking-tight"
-                style={{ fontSize: 'clamp(1.6rem, 3.5vw, 2.8rem)', color: '#F5F0E8' }}>
-                Мы не обещаем невозможного.{' '}
-                <br className="hidden sm:block" />
-                Мы обещаем то, что умеем делать хорошо —{' '}
-                <br className="hidden sm:block" />
-                <span style={{ color: '#8B1A2F' }}>и делаем это каждый день.</span>
-              </h2>
-
-              {/* Author line */}
-              <div className="flex items-center justify-center gap-3 pt-2">
-                <div className="h-px w-12" style={{ background: 'rgba(139,26,47,0.5)' }} />
-                <span className="text-sm font-semibold uppercase tracking-widest"
-                  style={{ color: 'rgba(245,240,232,0.4)' }}>
-                  Влад, EASTWIND LOGISTIC
-                </span>
-                <div className="h-px w-12" style={{ background: 'rgba(139,26,47,0.5)' }} />
-              </div>
-            </motion.div>
-          </InViewSection>
-        </div>
-      </section>
+      {/* ── REVIEWS ───────────────────────────────────────────────────────── */}
+      {reviews.length > 0 && (
+        <section className="py-28 relative overflow-hidden">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6">
+            <InViewSection className="text-center mb-14">
+              <motion.div variants={fadeUp}>
+                <div className="section-label justify-center mb-4">Отзывы</div>
+                <h2 className="font-display text-4xl sm:text-5xl text-milk">
+                  Что говорят клиенты
+                </h2>
+              </motion.div>
+            </InViewSection>
+            <ReviewsSlider reviews={reviews} />
+          </div>
+        </section>
+      )}
 
       {/* ── CTA ───────────────────────────────────────────────────────────── */}
       <section className="py-20 px-4 sm:px-6">

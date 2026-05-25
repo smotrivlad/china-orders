@@ -1,13 +1,9 @@
 'use server'
 
-import { revalidatePath } from 'next/cache'
-import { adminClient } from '@/lib/supabase/admin'
+// Support admin actions are now handled via API routes directly from
+// SupportSessionCard (Client Component):
+//   POST /api/admin/support/[session_id]/reply  — send manager message
+//   POST /api/admin/support/[session_id]/close  — close dialog
 
-export async function markAnswered(id: string, answered: boolean) {
-  await adminClient
-    .from('support_messages')
-    .update({ answered })
-    .eq('id', id)
+export {}
 
-  revalidatePath('/admin/support')
-}

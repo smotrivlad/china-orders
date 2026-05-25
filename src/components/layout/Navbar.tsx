@@ -25,9 +25,10 @@ export default function Navbar() {
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-8">
           {[
-            ['#services', 'Услуги'],
-            ['#process', 'Как работаем'],
-            ['/track', 'Отследить'],
+            ['/#services', 'Услуги'],
+            ['/#process',  'Как работаем'],
+            ['/about',     'О компании'],
+            ['/track',     'Отследить'],
           ].map(([href, label]) => (
             <a key={href} href={href} className="text-sm text-milk/60 hover:text-milk transition-colors font-medium">
               {label}
@@ -54,9 +55,10 @@ export default function Navbar() {
       {open && (
         <div className="md:hidden glass border-t border-white/5 px-4 py-6 space-y-4">
           {[
-            ['#services', 'Услуги'],
-            ['#process', 'Как работаем'],
-            ['/track', 'Отследить заявку'],
+            ['/#services', 'Услуги'],
+            ['/#process',  'Как работаем'],
+            ['/about',     'О компании'],
+            ['/track',     'Отследить заявку'],
           ].map(([href, label]) => (
             <a key={href} href={href} onClick={() => setOpen(false)}
               className="block text-milk/70 hover:text-milk py-2 border-b border-white/5">

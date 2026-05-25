@@ -5,13 +5,13 @@ import { adminClient } from '@/lib/supabase/admin'
 export const dynamic = 'force-dynamic'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  // Unread support messages count for the nav badge
+  // Active support sessions count for the nav badge
   let newSupportCount = 0
   try {
     const { count } = await adminClient
-      .from('support_messages')
+      .from('support_sessions')
       .select('*', { count: 'exact', head: true })
-      .eq('answered', false)
+      .in('status', ['open', 'pending_close'])
     newSupportCount = count ?? 0
   } catch {
     // Table might not exist yet
@@ -39,6 +39,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
                   {newSupportCount > 9 ? '9+' : newSupportCount}
                 </span>
               )}
+            </Link>
+            <Link href="/admin/reviews"
+              className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+              Отзывы
             </Link>
           </div>
           <LogoutButton />
