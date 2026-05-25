@@ -10,9 +10,10 @@ async function isAuthorized(): Promise<boolean> {
 export const dynamic = 'force-dynamic'
 
 // PATCH update review
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAuthorized()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { id } = await params
   const body = await req.json()
   const update: Record<string, unknown> = {}
 
@@ -24,20 +25,21 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   const { error } = await adminClient
     .from('reviews')
     .update(update)
-    .eq('id', params.id)
+    .eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
 
 // DELETE review
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!await isAuthorized()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { id } = await params
   const { error } = await adminClient
     .from('reviews')
     .delete()
-    .eq('id', params.id)
+    .eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
