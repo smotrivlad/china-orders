@@ -7,6 +7,9 @@ import { useCallback, useEffect, useState } from 'react'
 interface ReviewPhoto { id: string; url: string; sort_order: number }
 interface Review { id: string; client_name: string; text: string; photos: ReviewPhoto[]; created_at: string }
 
+/* ── Lightbox state type — keyed by review ID so it's never ambiguous ────── */
+interface LightboxState { reviewId: string; url: string }
+
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 
 function StarRow() {
@@ -25,87 +28,72 @@ function initials(name: string) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
-/* ── Photo gallery ───────────────────────────────────────────────────────── */
+/* ── Photo gallery — NO local lightbox state; fires callback instead ──────── */
+/*
+ * Why no local state here: Embla applies transform: translateX to the slides
+ * container, which creates a new CSS containing block. Any position:fixed
+ * element rendered inside that container would be positioned relative to the
+ * transformed ancestor, NOT the viewport — causing it to appear over the
+ * wrong slide.  The lightbox is lifted to ReviewsSlider and rendered outside
+ * the Embla viewport so position:fixed works correctly.
+ */
 
-function PhotoGallery({ photos }: { photos: ReviewPhoto[] }) {
-  const [lightbox, setLightbox] = useState<string | null>(null)
+function PhotoGallery({
+  photos,
+  reviewId,
+  onOpen,
+}: {
+  photos: ReviewPhoto[]
+  reviewId: string
+  onOpen: (state: LightboxState) => void
+}) {
   if (!photos.length) return null
 
   const count = photos.length
 
-  return (
-    <>
-      {count === 1 ? (
-        /* Single photo — 4:3 with rounded corners */
+  return count === 1 ? (
+    /* Single photo — 4:3 */
+    <div
+      className="relative overflow-hidden rounded-xl cursor-zoom-in group aspect-[4/3]"
+      onClick={() => onOpen({ reviewId, url: photos[0].url })}
+    >
+      <img
+        src={photos[0].url}
+        alt="Фото отзыва"
+        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+      />
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
+        <svg className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+        </svg>
+      </div>
+    </div>
+  ) : (
+    /* 2-4 photos — thumbnail grid */
+    <div className="grid grid-cols-2 gap-1 rounded-xl overflow-hidden">
+      {photos.map((p, i) => (
         <div
-          className="relative overflow-hidden rounded-xl cursor-zoom-in group aspect-[4/3]"
-          onClick={() => setLightbox(photos[0].url)}
+          key={p.id}
+          className={`relative overflow-hidden cursor-zoom-in group aspect-square ${
+            count === 3 && i === 0 ? 'col-span-2 aspect-[2/1]' : ''
+          }`}
+          onClick={() => onOpen({ reviewId, url: p.url })}
         >
           <img
-            src={photos[0].url}
-            alt="Фото отзыва"
+            src={p.url}
+            alt={`Фото ${i + 1}`}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
-            <svg className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
-            </svg>
-          </div>
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200" />
         </div>
-      ) : (
-        /* 2-4 photos — thumbnail grid */
-        <div className={`grid gap-1 rounded-xl overflow-hidden ${count === 2 ? 'grid-cols-2' : 'grid-cols-2'}`}>
-          {photos.map((p, i) => (
-            <div
-              key={p.id}
-              className={`relative overflow-hidden cursor-zoom-in group aspect-square ${
-                count === 3 && i === 0 ? 'col-span-2 aspect-[2/1]' : ''
-              }`}
-              onClick={() => setLightbox(p.url)}
-            >
-              <img
-                src={p.url}
-                alt={`Фото ${i + 1}`}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200" />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Lightbox */}
-      {lightbox && (
-        <div
-          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4"
-          onClick={() => setLightbox(null)}
-        >
-          <button
-            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-colors text-2xl"
-            onClick={() => setLightbox(null)}
-          >
-            ×
-          </button>
-          <img
-            src={lightbox}
-            alt="Фото отзыва"
-            className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          />
-        </div>
-      )}
-    </>
+      ))}
+    </div>
   )
 }
 
 /* ── Arrow button ────────────────────────────────────────────────────────── */
 
-function ArrowButton({
-  direction, onClick,
-}: {
-  direction: 'prev' | 'next'
-  onClick: () => void
-}) {
+function ArrowButton({ direction, onClick }: { direction: 'prev' | 'next'; onClick: () => void }) {
   const isPrev = direction === 'prev'
   return (
     <button
@@ -123,14 +111,8 @@ function ArrowButton({
         transform: `translateY(-50%) translateX(${isPrev ? '-50%' : '50%'})`,
       }}
     >
-      <svg
-        className="w-5 h-5"
-        fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
-      >
-        <path
-          strokeLinecap="round" strokeLinejoin="round"
-          d={isPrev ? 'M15 19l-7-7 7-7' : 'M9 5l7 7-7 7'}
-        />
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d={isPrev ? 'M15 19l-7-7 7-7' : 'M9 5l7 7-7 7'} />
       </svg>
     </button>
   )
@@ -146,6 +128,13 @@ export default function ReviewsSlider({ reviews }: { reviews: Review[] }) {
 
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [scrollSnaps, setScrollSnaps]     = useState<number[]>([])
+
+  /*
+   * Lightbox state lives HERE — outside the Embla container — so the
+   * position:fixed overlay is not affected by Embla's translateX transform.
+   * It is keyed by { reviewId, url } so there is never any index ambiguity.
+   */
+  const [lightbox, setLightbox] = useState<LightboxState | null>(null)
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return
@@ -167,22 +156,27 @@ export default function ReviewsSlider({ reviews }: { reviews: Review[] }) {
   /* Keyboard navigation */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (lightbox) {
+        if (e.key === 'Escape') setLightbox(null)
+        return  // don't scroll carousel while lightbox is open
+      }
       if (e.key === 'ArrowLeft')  scrollPrev()
       if (e.key === 'ArrowRight') scrollNext()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [scrollPrev, scrollNext])
+  }, [scrollPrev, scrollNext, lightbox])
 
   if (!reviews.length) return null
 
   return (
+    /* overflow:visible so the arrows can protrude, and so the lightbox
+       (rendered here, outside Embla) is not clipped */
     <div className="relative">
-      {/* Arrows — visible sm+, positioned outside carousel track */}
       <ArrowButton direction="prev" onClick={scrollPrev} />
       <ArrowButton direction="next" onClick={scrollNext} />
 
-      {/* Carousel — adds side padding on sm+ to not clip arrows */}
+      {/* ── Embla viewport ──────────────────────────────────────────────── */}
       <div ref={emblaRef} className="overflow-hidden sm:mx-6">
         <div className="flex gap-5">
           {reviews.map(r => {
@@ -202,12 +196,9 @@ export default function ReviewsSlider({ reviews }: { reviews: Review[] }) {
                     border: '1px solid rgba(245,240,232,0.07)',
                   }}
                 >
-                  {/* Stars */}
                   <StarRow />
 
-                  {/* Body: text + photos */}
                   <div className={`flex-1 flex gap-4 ${hasPhotos ? 'flex-col sm:flex-row' : 'flex-col'}`}>
-                    {/* Text — bottom on mobile (after photo), left on desktop */}
                     <p
                       className="flex-1 text-sm leading-[1.8] whitespace-pre-line order-last sm:order-first"
                       style={{ color: 'rgba(245,240,232,0.65)' }}
@@ -215,18 +206,20 @@ export default function ReviewsSlider({ reviews }: { reviews: Review[] }) {
                       &ldquo;{r.text}&rdquo;
                     </p>
 
-                    {/* Photos — top on mobile (order-first), right on desktop */}
                     {hasPhotos && (
                       <div className="shrink-0 order-first sm:order-last w-full sm:w-[130px]">
-                        {/* On mobile: cap width and centre */}
                         <div className="max-w-[300px] sm:max-w-none mx-auto sm:mx-0">
-                          <PhotoGallery photos={r.photos} />
+                          {/* onOpen fires upward — lightbox renders outside Embla */}
+                          <PhotoGallery
+                            photos={r.photos}
+                            reviewId={r.id}
+                            onOpen={setLightbox}
+                          />
                         </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Footer */}
                   <div
                     className="flex items-center gap-3 pt-3"
                     style={{ borderTop: '1px solid rgba(245,240,232,0.06)' }}
@@ -249,7 +242,7 @@ export default function ReviewsSlider({ reviews }: { reviews: Review[] }) {
         </div>
       </div>
 
-      {/* Dots */}
+      {/* ── Dots ────────────────────────────────────────────────────────── */}
       {scrollSnaps.length > 1 && (
         <div className="flex justify-center gap-2 mt-8">
           {scrollSnaps.map((_, i) => (
@@ -265,6 +258,30 @@ export default function ReviewsSlider({ reviews }: { reviews: Review[] }) {
               aria-label={`Отзыв ${i + 1}`}
             />
           ))}
+        </div>
+      )}
+
+      {/* ── Lightbox — rendered OUTSIDE the Embla container ─────────────
+           This is the fix: position:fixed works correctly here because
+           no ancestor has a CSS transform applied.
+           State is keyed by { reviewId, url } — never by slide index.    */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            className="absolute top-4 right-4 w-10 h-10 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-colors text-2xl"
+            onClick={() => setLightbox(null)}
+          >
+            ×
+          </button>
+          <img
+            src={lightbox.url}
+            alt="Фото отзыва"
+            className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          />
         </div>
       )}
     </div>
