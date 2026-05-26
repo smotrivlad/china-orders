@@ -7,11 +7,17 @@ import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
 import ReviewsSlider from '@/components/ReviewsSlider'
 
+interface ReviewPhoto {
+  id: string
+  url: string
+  sort_order: number
+}
+
 interface Review {
   id: string
   client_name: string
   text: string
-  photo_url: string | null
+  photos: ReviewPhoto[]
   created_at: string
 }
 

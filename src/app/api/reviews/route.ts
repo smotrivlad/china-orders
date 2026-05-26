@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 export async function GET() {
   const { data, error } = await adminClient
     .from('reviews')
-    .select('id, client_name, text, photo_url, created_at')
+    .select('id, client_name, text, created_at, review_photos(id, url, sort_order)')
     .eq('is_published', true)
     .order('created_at', { ascending: false })
 
@@ -15,5 +15,12 @@ export async function GET() {
     return NextResponse.json({ reviews: [] })
   }
 
-  return NextResponse.json({ reviews: data ?? [] })
+  // Sort photos by sort_order within each review
+  const reviews = (data ?? []).map(r => ({
+    ...r,
+    photos: ((r.review_photos as { id: string; url: string; sort_order: number }[] | null) ?? [])
+      .sort((a, b) => a.sort_order - b.sort_order),
+  }))
+
+  return NextResponse.json({ reviews })
 }

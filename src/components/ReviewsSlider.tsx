@@ -4,11 +4,17 @@ import useEmblaCarousel from 'embla-carousel-react'
 import Autoplay from 'embla-carousel-autoplay'
 import { useCallback, useEffect, useState } from 'react'
 
+interface ReviewPhoto {
+  id: string
+  url: string
+  sort_order: number
+}
+
 interface Review {
   id: string
   client_name: string
   text: string
-  photo_url: string | null
+  photos: ReviewPhoto[]
   created_at: string
 }
 
@@ -26,6 +32,69 @@ function StarRow() {
 
 function initials(name: string) {
   return name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
+}
+
+function PhotoGallery({ photos }: { photos: ReviewPhoto[] }) {
+  const [lightbox, setLightbox] = useState<string | null>(null)
+
+  if (!photos.length) return null
+
+  const count = photos.length
+
+  return (
+    <>
+      <div
+        className={`grid gap-1.5 rounded-xl overflow-hidden ${
+          count === 1 ? 'grid-cols-1' :
+          count === 2 ? 'grid-cols-2' :
+          count === 3 ? 'grid-cols-3' :
+          'grid-cols-2'
+        }`}
+      >
+        {photos.map((p, i) => (
+          <div
+            key={p.id}
+            className={`relative overflow-hidden cursor-zoom-in group ${
+              count === 4 ? 'aspect-square' : 'aspect-video'
+            } ${count === 3 && i === 0 ? 'col-span-2 !aspect-video' : ''}`}
+            onClick={() => setLightbox(p.url)}
+          >
+            <img
+              src={p.url}
+              alt={`Фото ${i + 1}`}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-200 flex items-center justify-center">
+              <svg className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+              </svg>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightbox(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white/70 hover:text-white text-4xl leading-none font-light"
+            onClick={() => setLightbox(null)}
+          >
+            ×
+          </button>
+          <img
+            src={lightbox}
+            alt="Фото отзыва"
+            className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
+  )
 }
 
 export default function ReviewsSlider({ reviews }: { reviews: Review[] }) {
@@ -56,7 +125,6 @@ export default function ReviewsSlider({ reviews }: { reviews: Review[] }) {
 
   return (
     <div className="relative">
-      {/* Carousel viewport */}
       <div ref={emblaRef} className="overflow-hidden">
         <div className="flex gap-5">
           {reviews.map(r => {
@@ -75,22 +143,17 @@ export default function ReviewsSlider({ reviews }: { reviews: Review[] }) {
                     border: '1px solid rgba(245,240,232,0.07)',
                   }}
                 >
-                  {/* Stars */}
                   <StarRow />
 
-                  {/* Text */}
-                  <p className="flex-1 text-sm leading-[1.8]" style={{ color: 'rgba(245,240,232,0.65)' }}>
+                  <p className="flex-1 text-sm leading-[1.8] whitespace-pre-line" style={{ color: 'rgba(245,240,232,0.65)' }}>
                     &ldquo;{r.text}&rdquo;
                   </p>
 
-                  {/* Photo if exists */}
-                  {r.photo_url && (
-                    <div className="rounded-xl overflow-hidden aspect-video">
-                      <img src={r.photo_url} alt="Фото товара" className="w-full h-full object-cover" />
-                    </div>
+                  {/* Photos — only rendered when photos exist */}
+                  {r.photos.length > 0 && (
+                    <PhotoGallery photos={r.photos} />
                   )}
 
-                  {/* Footer: avatar + name + date */}
                   <div className="flex items-center gap-3 pt-3"
                     style={{ borderTop: '1px solid rgba(245,240,232,0.06)' }}>
                     <div
@@ -111,7 +174,6 @@ export default function ReviewsSlider({ reviews }: { reviews: Review[] }) {
         </div>
       </div>
 
-      {/* Dot navigation */}
       {scrollSnaps.length > 1 && (
         <div className="flex justify-center gap-2 mt-8">
           {scrollSnaps.map((_, i) => (
