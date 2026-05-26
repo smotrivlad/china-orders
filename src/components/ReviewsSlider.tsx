@@ -188,7 +188,7 @@ export default function ReviewsSlider({ reviews }: { reviews: Review[] }) {
           {reviews.map(r => {
             const hasPhotos = r.photos.length > 0
             const date = new Date(r.created_at).toLocaleDateString('ru-RU', {
-              day: '2-digit', month: 'long', year: 'numeric',
+              day: 'numeric', month: 'long', year: 'numeric',
             })
             return (
               <div

@@ -17,7 +17,11 @@ interface Review {
   photos: ReviewPhoto[]
 }
 
-const emptyForm = { client_name: '', text: '', is_published: true }
+function todayStr() {
+  return new Date().toISOString().split('T')[0]
+}
+
+const emptyForm = { client_name: '', text: '', is_published: true, created_at: todayStr() }
 
 export default function AdminReviewsPage() {
   const [reviews, setReviews]     = useState<Review[]>([])
@@ -57,7 +61,12 @@ export default function AdminReviewsPage() {
 
   function startEdit(r: Review) {
     setEditId(r.id)
-    setForm({ client_name: r.client_name, text: r.text, is_published: r.is_published })
+    setForm({
+      client_name: r.client_name,
+      text: r.text,
+      is_published: r.is_published,
+      created_at: r.created_at.split('T')[0],   // YYYY-MM-DD for date input
+    })
     setError('')
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -191,15 +200,29 @@ export default function AdminReviewsPage() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              id="is_published"
-              type="checkbox"
-              checked={form.is_published}
-              onChange={e => setForm(f => ({ ...f, is_published: e.target.checked }))}
-              className="rounded border-gray-300"
-            />
-            <label htmlFor="is_published" className="text-sm text-gray-700">Опубликован</label>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Дата отзыва</label>
+              <input
+                type="date"
+                value={form.created_at}
+                onChange={e => setForm(f => ({ ...f, created_at: e.target.value }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-800/30"
+              />
+            </div>
+
+            <div className="flex items-end pb-2">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  id="is_published"
+                  type="checkbox"
+                  checked={form.is_published}
+                  onChange={e => setForm(f => ({ ...f, is_published: e.target.checked }))}
+                  className="rounded border-gray-300"
+                />
+                <span className="text-sm text-gray-700">Опубликован</span>
+              </label>
+            </div>
           </div>
 
           {editId && (
@@ -259,7 +282,7 @@ export default function AdminReviewsPage() {
                       {r.is_published ? 'Опубликован' : 'Скрыт'}
                     </span>
                     <span className="text-[10px] text-gray-400">
-                      {new Date(r.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' })}
+                      {new Date(r.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600 mt-1 leading-relaxed line-clamp-3 whitespace-pre-line">

@@ -17,10 +17,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const body = await req.json()
   const update: Record<string, unknown> = {}
 
-  if (body.client_name !== undefined) update.client_name = body.client_name.trim()
-  if (body.text !== undefined) update.text = body.text.trim()
-  if (body.photo_url !== undefined) update.photo_url = body.photo_url || null
+  if (body.client_name  !== undefined) update.client_name  = body.client_name.trim()
+  if (body.text         !== undefined) update.text         = body.text.trim()
+  if (body.photo_url    !== undefined) update.photo_url    = body.photo_url || null
   if (body.is_published !== undefined) update.is_published = body.is_published
+  if (body.created_at   !== undefined) {
+    // Accepts YYYY-MM-DD from the date picker; store as UTC midnight
+    const d = new Date(body.created_at)
+    if (!isNaN(d.getTime())) update.created_at = d.toISOString()
+  }
 
   const { error } = await adminClient
     .from('reviews')
