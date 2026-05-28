@@ -1,17 +1,47 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Logo from '@/components/ui/Logo'
+import { createClient } from '@/lib/supabase/client'
+import type { User } from '@supabase/supabase-js'
 
 export default function Navbar() {
+  const router = useRouter()
   const [scrolled, setScrolled] = useState(false)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]         = useState(false)
+  const [user, setUser]         = useState<User | null>(null)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40)
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  // Subscribe to auth state changes
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUser(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    setOpen(false)
+    router.push('/')
+    router.refresh()
+  }
+
+  const navLinks = [
+    ['/#services', 'Услуги'],
+    ['/#process',  'Как работаем'],
+    ['/about',     'О компании'],
+    ['/track',     'Отследить'],
+  ] as const
 
   return (
     <header
@@ -24,19 +54,36 @@ export default function Navbar() {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-8">
-          {[
-            ['/#services', 'Услуги'],
-            ['/#process',  'Как работаем'],
-            ['/about',     'О компании'],
-            ['/track',     'Отследить'],
-          ].map(([href, label]) => (
+          {navLinks.map(([href, label]) => (
             <a key={href} href={href} className="text-sm text-milk/60 hover:text-milk transition-colors font-medium">
               {label}
             </a>
           ))}
-          <Link href="/order" className="btn-primary py-2.5 px-5 text-sm">
-            Оформить заявку
-          </Link>
+
+          {user ? (
+            /* Logged in */
+            <div className="flex items-center gap-4">
+              <Link href="/cabinet" className="text-sm text-milk/60 hover:text-milk transition-colors font-medium">
+                Личный кабинет
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="text-sm text-milk/40 hover:text-milk/70 transition-colors font-medium"
+              >
+                Выйти
+              </button>
+            </div>
+          ) : (
+            /* Logged out */
+            <div className="flex items-center gap-3">
+              <Link href="/login" className="text-sm text-milk/60 hover:text-milk transition-colors font-medium">
+                Войти
+              </Link>
+              <Link href="/order" className="btn-primary py-2.5 px-5 text-sm">
+                Оформить заявку
+              </Link>
+            </div>
+          )}
         </nav>
 
         {/* Mobile burger */}
@@ -54,20 +101,35 @@ export default function Navbar() {
       {/* Mobile menu */}
       {open && (
         <div className="md:hidden glass border-t border-white/5 px-4 py-6 space-y-4">
-          {[
-            ['/#services', 'Услуги'],
-            ['/#process',  'Как работаем'],
-            ['/about',     'О компании'],
-            ['/track',     'Отследить заявку'],
-          ].map(([href, label]) => (
+          {navLinks.map(([href, label]) => (
             <a key={href} href={href} onClick={() => setOpen(false)}
               className="block text-milk/70 hover:text-milk py-2 border-b border-white/5">
               {label}
             </a>
           ))}
-          <Link href="/order" className="btn-primary w-full justify-center mt-2" onClick={() => setOpen(false)}>
-            Оформить заявку
-          </Link>
+
+          {user ? (
+            <>
+              <Link href="/cabinet" onClick={() => setOpen(false)}
+                className="block text-milk/70 hover:text-milk py-2 border-b border-white/5">
+                Личный кабинет
+              </Link>
+              <button onClick={handleLogout}
+                className="block w-full text-left text-milk/40 hover:text-milk/70 py-2 text-sm">
+                Выйти
+              </button>
+            </>
+          ) : (
+            <>
+              <Link href="/login" onClick={() => setOpen(false)}
+                className="block text-milk/70 hover:text-milk py-2 border-b border-white/5">
+                Войти
+              </Link>
+              <Link href="/order" className="btn-primary w-full justify-center mt-2" onClick={() => setOpen(false)}>
+                Оформить заявку
+              </Link>
+            </>
+          )}
         </div>
       )}
     </header>

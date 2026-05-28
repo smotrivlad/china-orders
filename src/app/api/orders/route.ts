@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { adminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
 import { notifyNewOrder } from '@/lib/utils/telegram'
 import { orderSchema } from '@/lib/validations/order'
 import type { OrderItem } from '@/types'
@@ -29,6 +30,14 @@ async function uploadFile(file: File): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest) {
+  // ── Читаем user_id из сессии (опционально — не блокируем анонимные заявки) ─
+  let userId: string | null = null
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    userId = user?.id ?? null
+  } catch { /* ignore — auth is optional for order creation */ }
+
   // ── Парсим тело ────────────────────────────────────────────────────────────
   let formData: FormData
   try {
@@ -118,9 +127,13 @@ export async function POST(req: NextRequest) {
   }
 
   // Пробуем с колонкой items; если её нет — fallback без неё
+  const insertData = userId
+    ? { ...baseData, items, user_id: userId }
+    : { ...baseData, items }
+
   let { data: order, error } = await adminClient
     .from('orders')
-    .insert({ ...baseData, items })
+    .insert(insertData)
     .select('*, statuses(*)')
     .single()
 
@@ -131,9 +144,10 @@ export async function POST(req: NextRequest) {
 
     if (isColMissing) {
       console.warn('[orders] items column missing — falling back to insert without it')
+      const fallbackData = userId ? { ...baseData, user_id: userId } : baseData
       const fallback = await adminClient
         .from('orders')
-        .insert(baseData)
+        .insert(fallbackData)
         .select('*, statuses(*)')
         .single()
       if (fallback.error) {
