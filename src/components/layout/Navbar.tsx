@@ -10,7 +10,8 @@ export default function Navbar() {
   const router = useRouter()
   const [scrolled, setScrolled] = useState(false)
   const [open, setOpen]         = useState(false)
-  const [user, setUser]         = useState<User | null>(null)
+  // undefined = ещё не загружено, null = не залогинен, User = залогинен
+  const [user, setUser]         = useState<User | null | undefined>(undefined)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40)
@@ -18,10 +19,9 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
-  // Subscribe to auth state changes
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
+    supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
       setUser(session?.user ?? null)
     })
@@ -60,27 +60,38 @@ export default function Navbar() {
             </a>
           ))}
 
-          {user ? (
-            /* Logged in */
-            <div className="flex items-center gap-4">
-              <Link href="/cabinet" className="text-sm text-milk/60 hover:text-milk transition-colors font-medium">
+          {/* Auth buttons — показываем только после загрузки состояния */}
+          {user === undefined ? (
+            <div className="w-36 h-9" /> /* placeholder чтобы не прыгал layout */
+          ) : user ? (
+            /* Залогинен */
+            <div className="flex items-center gap-3">
+              <Link
+                href="/cabinet"
+                className="text-sm font-medium text-milk hover:text-milk/80 transition-colors px-4 py-2 rounded-xl"
+                style={{ border: '1px solid rgba(245,240,232,0.15)' }}
+              >
                 Личный кабинет
               </Link>
               <button
                 onClick={handleLogout}
-                className="text-sm text-milk/40 hover:text-milk/70 transition-colors font-medium"
+                className="text-sm font-medium text-milk/60 hover:text-milk transition-colors"
               >
                 Выйти
               </button>
             </div>
           ) : (
-            /* Logged out */
+            /* Не залогинен */
             <div className="flex items-center gap-3">
-              <Link href="/login" className="text-sm text-milk/60 hover:text-milk transition-colors font-medium">
+              <Link
+                href="/login"
+                className="text-sm font-medium text-milk hover:text-milk/80 transition-colors px-4 py-2 rounded-xl"
+                style={{ border: '1px solid rgba(245,240,232,0.15)' }}
+              >
                 Войти
               </Link>
-              <Link href="/order" className="btn-primary py-2.5 px-5 text-sm">
-                Оформить заявку
+              <Link href="/register" className="btn-primary py-2.5 px-5 text-sm">
+                Регистрация
               </Link>
             </div>
           )}
@@ -111,22 +122,22 @@ export default function Navbar() {
           {user ? (
             <>
               <Link href="/cabinet" onClick={() => setOpen(false)}
-                className="block text-milk/70 hover:text-milk py-2 border-b border-white/5">
+                className="block text-milk/80 hover:text-milk py-2 border-b border-white/5 font-medium">
                 Личный кабинет
               </Link>
               <button onClick={handleLogout}
-                className="block w-full text-left text-milk/40 hover:text-milk/70 py-2 text-sm">
+                className="block w-full text-left text-milk/60 hover:text-milk py-2 text-sm font-medium">
                 Выйти
               </button>
             </>
           ) : (
             <>
               <Link href="/login" onClick={() => setOpen(false)}
-                className="block text-milk/70 hover:text-milk py-2 border-b border-white/5">
+                className="block text-milk/80 hover:text-milk py-2 border-b border-white/5 font-medium">
                 Войти
               </Link>
-              <Link href="/order" className="btn-primary w-full justify-center mt-2" onClick={() => setOpen(false)}>
-                Оформить заявку
+              <Link href="/register" className="btn-primary w-full justify-center mt-2" onClick={() => setOpen(false)}>
+                Регистрация
               </Link>
             </>
           )}
