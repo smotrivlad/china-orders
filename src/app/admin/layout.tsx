@@ -44,6 +44,14 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
               Отзывы
             </Link>
+            <Link href="/admin/tariffs"
+              className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+              Тарифы
+            </Link>
+            <Link href="/admin/calculator"
+              className="text-sm text-gray-600 hover:text-gray-900 transition-colors">
+              Калькулятор
+            </Link>
           </div>
           <LogoutButton />
         </div>

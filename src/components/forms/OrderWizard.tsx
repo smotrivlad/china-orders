@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -63,6 +63,23 @@ export default function OrderWizard() {
 
   const urgency   = watch('urgency')
   const orderType = watch('order_type')
+
+  /* ── Предзаполнение из калькулятора ─────────────────────────────── */
+  const [calcBanner, setCalcBanner] = useState('')
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('calc_prefill')
+      if (!raw) return
+      sessionStorage.removeItem('calc_prefill')
+      const { order_type, summary } = JSON.parse(raw)
+      if (order_type) setValue('order_type', order_type)
+      if (summary) {
+        setItems([{ ...emptyItem(), description: `[Расчёт с калькулятора]\n${summary}` }])
+        setCalcBanner(summary.split('\n')[0] ?? '')
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   /* ── Навигация ───────────────────────────────────────────────────── */
   const next = async () => {
@@ -172,6 +189,13 @@ export default function OrderWizard() {
   /* ── Render ──────────────────────────────────────────────────────── */
   return (
     <div className="w-full">
+      {/* Calculator pre-fill banner */}
+      {calcBanner && (
+        <div className="mb-5 rounded-xl px-4 py-3 text-xs leading-relaxed"
+          style={{ background: 'rgba(139,26,47,0.12)', border: '1px solid rgba(139,26,47,0.25)', color: 'rgba(245,240,232,0.7)' }}>
+          🧮 Расчёт из калькулятора добавлен в описание товара
+        </div>
+      )}
       {/* Step indicators */}
       <div className="flex items-start gap-0 mb-10">
         {STEPS.map((s, i) => (

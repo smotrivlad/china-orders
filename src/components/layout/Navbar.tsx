@@ -37,10 +37,11 @@ export default function Navbar() {
   }
 
   const navLinks = [
-    ['/#services', 'Услуги'],
-    ['/#process',  'Как работаем'],
-    ['/about',     'О компании'],
-    ['/track',     'Отследить'],
+    ['/#services',   'Услуги'],
+    ['/#process',    'Как работаем'],
+    ['/about',       'О компании'],
+    ['/calculator',  'Калькулятор'],
+    ['/track',       'Отследить'],
   ] as const
 
   return (
