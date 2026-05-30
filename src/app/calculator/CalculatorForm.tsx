@@ -30,11 +30,10 @@ interface FormState {
 interface Route1 {
   loaders: number; almaty_ural_min: number; almaty_ural_max: number
   ural_tol_min: number; ural_tol_max: number
-  tk_transfer: number; small_weight: number
   total_min: number; total_max: number
 }
 interface Route2 {
-  loaders: number; tk_energia: number; small_weight: number; total: number
+  loaders: number; tk_energia: number; total: number
 }
 interface CalcResult {
   volume: number; density: number; tariff: Tariff
@@ -90,22 +89,19 @@ function compute(f: FormState, d: ApiData): CalcResult | null {
   const lots           = Math.ceil(wt / 5)
   const almaty_ural_min = aur_min * lots
   const almaty_ural_max = aur_max * lots
-  const tk_transfer     = f.order_type === 'group' ? 1000 : 0
-  const small_weight    = wt < 10 ? 500 : 0
 
   const route1: Route1 = {
     loaders, almaty_ural_min, almaty_ural_max,
     ural_tol_min: urt_min, ural_tol_max: urt_max,
-    tk_transfer, small_weight,
-    total_min: cargo_rub + loaders + almaty_ural_min + urt_min + tk_transfer + small_weight,
-    total_max: cargo_rub + loaders + almaty_ural_max + urt_max + tk_transfer + small_weight,
+    total_min: cargo_rub + loaders + almaty_ural_min + urt_min,
+    total_max: cargo_rub + loaders + almaty_ural_max + urt_max,
   }
 
   const show_both_routes = f.order_type === 'personal' && wt >= 10
   const route2: Route2 | undefined = show_both_routes
     ? {
-        loaders, tk_energia: wt * tk_per_kg, small_weight,
-        total: cargo_rub + loaders + wt * tk_per_kg + small_weight,
+        loaders, tk_energia: wt * tk_per_kg,
+        total: cargo_rub + loaders + wt * tk_per_kg,
       }
     : undefined
 
@@ -534,12 +530,10 @@ export default function CalculatorForm() {
                   {(!result.show_both_routes || f.chosen_route === 'ural') && <>
                     <Row label="Алматы → Уральск" val={rubRange(result.route1.almaty_ural_min, result.route1.almaty_ural_max)} />
                     <Row label="Уральск → Тольятти" val={rubRange(result.route1.ural_tol_min, result.route1.ural_tol_max)} />
-                    {result.route1.tk_transfer > 0 && <Row label="Передача в ТК" val={rub(result.route1.tk_transfer)} />}
                   </>}
                   {result.show_both_routes && f.chosen_route === 'tk_energy' && result.route2 && (
                     <Row label="ТК Энергия Алматы → Тольятти" val={rub(result.route2.tk_energia)} />
                   )}
-                  {result.route1.small_weight > 0 && <Row label="Доплата (вес < 10 кг)" val={rub(result.route1.small_weight)} />}
                   {result.pkg_min > 0 && <Row label={`Упаковка (${PACKAGING.find(p => p.value === f.packaging)?.label})`}
                     val={rubRange(result.pkg_min, result.pkg_max)} />}
                   {result.insurance_cost > 0 && <Row label={`Страховка (${result.insurance_rate}%)`} val={rub(result.insurance_cost)} />}
