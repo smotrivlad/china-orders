@@ -18,23 +18,28 @@ async function fetchCbrRate(): Promise<number | null> {
 }
 
 export async function GET() {
-  const [tariffsRes, settingsRes] = await Promise.all([
+  const [tariffsRes, settingsRes, commissionRes, packagingRes, insuranceRes] = await Promise.all([
     adminClient.from('tariffs').select('*').order('sort_order').order('density_min'),
     adminClient.from('tariff_settings').select('*'),
+    adminClient.from('commission_tiers').select('*').order('sort_order'),
+    adminClient.from('packaging_types').select('*').order('sort_order'),
+    adminClient.from('insurance_tiers').select('*').order('sort_order'),
   ])
 
   const settings: Record<string, string> = {}
-  for (const row of settingsRes.data ?? []) {
-    settings[row.key] = row.value
-  }
+  for (const row of settingsRes.data ?? []) settings[row.key] = row.value
 
-  const cbrRate = await fetchCbrRate()
+  const useCbr = settings.use_cbr_rate !== 'false'
+  const cbrRate = useCbr ? await fetchCbrRate() : null
   const usdRate = cbrRate ?? Number(settings.usd_rub ?? 90)
 
   return NextResponse.json({
-    tariffs:  tariffsRes.data  ?? [],
+    tariffs:          tariffsRes.data  ?? [],
     settings,
-    usd_rate: usdRate,
-    usd_rate_source: cbrRate ? 'cbr' : 'manual',
+    usd_rate:         usdRate,
+    usd_rate_source:  cbrRate ? 'cbr' : 'manual',
+    commission_tiers: commissionRes.data ?? [],
+    packaging_types:  packagingRes.data  ?? [],
+    insurance_tiers:  insuranceRes.data  ?? [],
   })
 }

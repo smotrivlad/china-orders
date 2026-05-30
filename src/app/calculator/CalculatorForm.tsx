@@ -9,11 +9,17 @@ interface Tariff {
   density_min: number; density_max: number | null
   slow_price: number; fast_price: number; sort_order: number
 }
+interface CommissionTier { id: string; amount_to: number | null; rate: number; sort_order: number }
+interface PackagingType  { id: string; value: string; label: string; price_min: number; price_max: number; per_m3: boolean; sort_order: number }
+interface InsuranceTier  { id: string; vpk_to: number | null; rate: number; sort_order: number }
 interface ApiData {
   tariffs: Tariff[]
   settings: Record<string, string>
   usd_rate: number
   usd_rate_source: 'cbr' | 'manual'
+  commission_tiers: CommissionTier[]
+  packaging_types:  PackagingType[]
+  insurance_tiers:  InsuranceTier[]
 }
 interface FormState {
   order_type: 'personal' | 'group'
@@ -45,17 +51,6 @@ interface CalcResult {
   show_both_routes: boolean
 }
 
-// ── Constants ────────────────────────────────────────────────────────────────
-const PACKAGING = [
-  { value: 'none',     label: 'Без упаковки',  min: 0,  max: 0,  per_m3: false },
-  { value: 'bag_tape', label: 'Мешок + скотч', min: 3,  max: 3,  per_m3: false },
-  { value: 'box',      label: 'Коробка',        min: 5,  max: 5,  per_m3: false },
-  { value: 'corners',  label: 'Уголки',         min: 7,  max: 7,  per_m3: false },
-  { value: 'foam',     label: 'Пенопласт',      min: 9,  max: 9,  per_m3: false },
-  { value: 'crate',    label: 'Обрешётка',      min: 12, max: 12, per_m3: false },
-  { value: 'pallet',   label: 'Паллет',         min: 25, max: 45, per_m3: false },
-  { value: 'plywood',  label: 'Фанера',         min: 40, max: 40, per_m3: true  },
-]
 
 // ── Core calculation function ─────────────────────────────────────────────────
 function compute(f: FormState, d: ApiData): CalcResult | null {
@@ -105,32 +100,32 @@ function compute(f: FormState, d: ApiData): CalcResult | null {
       }
     : undefined
 
-  // Packaging
-  const pkg = PACKAGING.find(p => p.value === f.packaging)
+  // Packaging — from DB
+  const pkg = d.packaging_types.find(p => p.value === f.packaging)
   let pkg_min = 0, pkg_max = 0
-  if (pkg && pkg.min > 0) {
-    pkg_min = pkg.per_m3 ? pkg.min * volume * usd : pkg.min * usd
-    pkg_max = pkg.per_m3 ? pkg.max * volume * usd : pkg.max * usd
+  if (pkg && pkg.price_min > 0) {
+    pkg_min = pkg.per_m3 ? pkg.price_min * volume * usd : pkg.price_min * usd
+    pkg_max = pkg.per_m3 ? pkg.price_max * volume * usd : pkg.price_max * usd
   }
 
-  // Insurance
+  // Insurance — tiers from DB
   let insurance_cost = 0, insurance_rate = 0
   if (f.insurance && parseFloat(f.product_cost) > 0) {
-    const pc = parseFloat(f.product_cost)
+    const pc  = parseFloat(f.product_cost)
     const vpk = pc / wt
-    insurance_rate = vpk <= 20 ? 1 : vpk <= 30 ? 2 : vpk <= 50 ? 3 : 4
+    const sorted = [...d.insurance_tiers].sort((a, b) => (a.vpk_to ?? Infinity) - (b.vpk_to ?? Infinity))
+    const tier = sorted.find(t => t.vpk_to === null || vpk <= Number(t.vpk_to))
+    insurance_rate = tier ? Number(tier.rate) : 0
     insurance_cost = pc * (insurance_rate / 100) * usd
   }
 
-  // Buyout — auto rate by RUB amount
+  // Buyout — auto rate from DB commission_tiers
   let buyout_cost = 0, buyout_rate = 0
   const buyoutRub = parseFloat(f.buyout_rub)
   if (buyoutRub > 0) {
-    buyout_rate = buyoutRub <= 50000 ? 10
-      : buyoutRub <= 100000 ? 8
-      : buyoutRub <= 300000 ? 5
-      : buyoutRub <= 750000 ? 3
-      : 1
+    const sorted = [...d.commission_tiers].sort((a, b) => (a.amount_to ?? Infinity) - (b.amount_to ?? Infinity))
+    const tier = sorted.find(t => t.amount_to === null || buyoutRub <= t.amount_to)
+    buyout_rate = tier ? Number(tier.rate) : 0
     buyout_cost = buyoutRub * (buyout_rate / 100)
   }
 
@@ -254,7 +249,7 @@ export default function CalculatorForm() {
       `Плотность: ${result?.density.toFixed(0)} кг/м³`,
       `Тариф: ${result?.price_per_kg} $/кг`,
       `Итого ~${total}`,
-      result?.pkg_min ? `Упаковка: ${PACKAGING.find(p => p.value === f.packaging)?.label}` : '',
+      result?.pkg_min ? `Упаковка: ${api?.packaging_types.find(p => p.value === f.packaging)?.label}` : '',
       result?.insurance_cost ? `Страховка (${result.insurance_rate}%): ${rub(result.insurance_cost)}` : '',
       result?.buyout_cost ? `Выкуп (${result.buyout_rate}%): ${rub(result.buyout_cost)}` : '',
     ].filter(Boolean).join('\n')
@@ -387,9 +382,9 @@ export default function CalculatorForm() {
                 <label className={labelCls}>Упаковка</label>
                 <select value={f.packaging} onChange={e => set('packaging', e.target.value)}
                   className={inputCls()} style={inputStyle}>
-                  {PACKAGING.map(p => (
+                  {(api?.packaging_types ?? []).map(p => (
                     <option key={p.value} value={p.value}>
-                      {p.label}{p.min > 0 ? ` — ${p.min === p.max ? `$${p.min}` : `$${p.min}–${p.max}`}${p.per_m3 ? '/м³' : ''}` : ''}
+                      {p.label}{p.price_min > 0 ? ` — ${p.price_min === p.price_max ? `$${p.price_min}` : `$${p.price_min}–${p.price_max}`}${p.per_m3 ? '/м³' : ''}` : ''}
                     </option>
                   ))}
                 </select>
@@ -538,7 +533,7 @@ export default function CalculatorForm() {
                   {result.show_both_routes && f.chosen_route === 'tk_energy' && result.route2 && (
                     <Row label="ТК Энергия Алматы → Тольятти" val={rub(result.route2.tk_energia)} />
                   )}
-                  {result.pkg_min > 0 && <Row label={`Упаковка (${PACKAGING.find(p => p.value === f.packaging)?.label})`}
+                  {result.pkg_min > 0 && <Row label={`Упаковка (${api?.packaging_types.find(p => p.value === f.packaging)?.label})`}
                     val={rubRange(result.pkg_min, result.pkg_max)} />}
                   {result.insurance_cost > 0 && <Row label={`Страховка (${result.insurance_rate}%)`} val={rub(result.insurance_cost)} />}
                   {result.buyout_cost > 0 && <Row label={`Выкуп (${result.buyout_rate}%)`} val={rub(result.buyout_cost)} />}
