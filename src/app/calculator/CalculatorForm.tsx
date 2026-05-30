@@ -24,7 +24,7 @@ interface FormState {
   packaging: string
   insurance: boolean
   product_cost: string
-  buyout_percent: string
+  buyout_rub: string
   chosen_route: 'ural' | 'tk_energy'
 }
 interface Route1 {
@@ -41,7 +41,7 @@ interface CalcResult {
   route1: Route1; route2?: Route2
   pkg_min: number; pkg_max: number
   insurance_cost: number; insurance_rate: number
-  buyout_cost: number
+  buyout_cost: number; buyout_rate: number
   show_both_routes: boolean
 }
 
@@ -122,16 +122,22 @@ function compute(f: FormState, d: ApiData): CalcResult | null {
     insurance_cost = pc * (insurance_rate / 100) * usd
   }
 
-  // Buyout
-  let buyout_cost = 0
-  const bp = parseFloat(f.buyout_percent)
-  const pc = parseFloat(f.product_cost)
-  if (bp > 0 && pc > 0) buyout_cost = pc * (bp / 100) * usd
+  // Buyout — auto rate by RUB amount
+  let buyout_cost = 0, buyout_rate = 0
+  const buyoutRub = parseFloat(f.buyout_rub)
+  if (buyoutRub > 0) {
+    buyout_rate = buyoutRub <= 50000 ? 10
+      : buyoutRub <= 100000 ? 8
+      : buyoutRub <= 300000 ? 5
+      : buyoutRub <= 750000 ? 3
+      : 1
+    buyout_cost = buyoutRub * (buyout_rate / 100)
+  }
 
   return {
     volume, density, tariff, price_per_kg, cargo_rub,
     route1, route2, pkg_min, pkg_max,
-    insurance_cost, insurance_rate, buyout_cost,
+    insurance_cost, insurance_rate, buyout_cost, buyout_rate,
     show_both_routes,
   }
 }
@@ -152,7 +158,7 @@ async function saveRequest(
         places: parseInt(f.places) || 1, packaging: f.packaging,
         insurance_rate: r.insurance_rate,
         product_cost: parseFloat(f.product_cost) || null,
-        buyout_percent: parseFloat(f.buyout_percent) || null,
+        buyout_percent: r.buyout_rate || null,
         total_min: Math.round(r.route1.total_min + extras),
         total_max: Math.round(r.route1.total_max + extras),
         session_id: sessionId,
@@ -184,7 +190,7 @@ export default function CalculatorForm() {
   const [f, setF] = useState<FormState>({
     order_type: 'personal', category: '', speed: 'slow',
     length: '', width: '', height: '', weight: '', places: '1',
-    packaging: 'none', insurance: false, product_cost: '', buyout_percent: '',
+    packaging: 'none', insurance: false, product_cost: '', buyout_rub: '',
     chosen_route: 'ural',
   })
   const [extrasOpen, setExtrasOpen]       = useState(false)
@@ -250,7 +256,7 @@ export default function CalculatorForm() {
       `Итого ~${total}`,
       result?.pkg_min ? `Упаковка: ${PACKAGING.find(p => p.value === f.packaging)?.label}` : '',
       result?.insurance_cost ? `Страховка (${result.insurance_rate}%): ${rub(result.insurance_cost)}` : '',
-      result?.buyout_cost ? `Выкуп (${f.buyout_percent}%): ${rub(result.buyout_cost)}` : '',
+      result?.buyout_cost ? `Выкуп (${result.buyout_rate}%): ${rub(result.buyout_cost)}` : '',
     ].filter(Boolean).join('\n')
 
     sessionStorage.setItem('calc_prefill', JSON.stringify({
@@ -405,18 +411,16 @@ export default function CalculatorForm() {
                   </div>
                 )}
               </div>
-              {!f.insurance && (
-                <div>
-                  <label className={labelCls}>Стоимость товара ($) — для расчёта выкупа</label>
-                  <input type="number" min="0" value={f.product_cost} onChange={e => set('product_cost', e.target.value)}
-                    placeholder="0" className={inputCls()} style={inputStyle} />
-                </div>
-              )}
               <div>
-                <label className={labelCls}>Процент выкупа (%)</label>
-                <input type="number" min="0" max="100" step="0.5" value={f.buyout_percent}
-                  onChange={e => set('buyout_percent', e.target.value)}
+                <label className={labelCls}>Сумма заказа в рублях (выкуп)</label>
+                <input type="number" min="0" step="1000" value={f.buyout_rub}
+                  onChange={e => set('buyout_rub', e.target.value)}
                   placeholder="0" className={inputCls()} style={inputStyle} />
+                {result && result.buyout_cost > 0 && (
+                  <p className="text-xs mt-1.5" style={{ color: 'rgba(245,240,232,0.4)' }}>
+                    {rub(parseFloat(f.buyout_rub))} → {result.buyout_rate}% → комиссия {rub(result.buyout_cost)}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -537,7 +541,7 @@ export default function CalculatorForm() {
                   {result.pkg_min > 0 && <Row label={`Упаковка (${PACKAGING.find(p => p.value === f.packaging)?.label})`}
                     val={rubRange(result.pkg_min, result.pkg_max)} />}
                   {result.insurance_cost > 0 && <Row label={`Страховка (${result.insurance_rate}%)`} val={rub(result.insurance_cost)} />}
-                  {result.buyout_cost > 0 && <Row label={`Выкуп (${f.buyout_percent}%)`} val={rub(result.buyout_cost)} />}
+                  {result.buyout_cost > 0 && <Row label={`Выкуп (${result.buyout_rate}%)`} val={rub(result.buyout_cost)} />}
                 </div>
               )}
             </div>
